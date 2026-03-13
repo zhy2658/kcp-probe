@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Kcp.Core": {
+      "commandName": "Project"
+    },
+    "配置文件 1": {
+      "commandName": "Executable",
+      "executablePath": "D:\\user\\desktop\\demo\\winui-demo\\App1\\KcpProbe.slnx"
+    }
+  }
+}

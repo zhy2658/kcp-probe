@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="KcpProbe.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:KcpProbe"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="KCP Tester">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header: Connection Config -->
+        <StackPanel Orientation="Horizontal" Spacing="10" Padding="10" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+            <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
+            <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
+            <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
+            <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
+        </StackPanel>
+
+        <!-- Content: Tabs -->
+        <NavigationView Grid.Row="1" PaneDisplayMode="Top" IsSettingsVisible="False">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Interface Test" Tag="Interface"/>
+                <NavigationViewItem Content="Stress Test" Tag="Stress"/>
+            </NavigationView.MenuItems>
+            <Frame x:Name="ContentFrame"/>
+        </NavigationView>
+        
+        <!-- Simplified Content for now without navigation logic overhead -->
+        <Grid Grid.Row="1" Padding="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Left: Interface Test -->
+            <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,10,0">
+                <TextBlock Text="Interface Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                <TextBox Header="Ping Content" Text="{Binding PingContent, Mode=TwoWay}"/>
+                <Button Content="Send Ping" Click="SendPing_Click"/>
+            </StackPanel>
+
+            <!-- Right: Stress Test -->
+            <StackPanel Grid.Column="1" Spacing="10" Margin="10,0,0,0" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10,0,0,0">
+                <TextBlock Text="Stress Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                <TextBlock Text="Simple Stress Test (100 QPS)"/>
+                <Button Content="Start/Stop Stress" Click="Stress_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Footer: Logs -->
+        <Grid Grid.Row="2" Height="200" Background="Black">
+            <ListView ItemsSource="{Binding Logs}" Foreground="LightGreen" FontFamily="Consolas"/>
+        </Grid>
+    </Grid>
+</Window>
