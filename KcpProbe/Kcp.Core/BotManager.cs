@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Kcp.Core;
 using KcpServer;
 
-namespace KcpProbe
+namespace Kcp.Core
 {
     public class BotManager
     {
-        private List<KcpClient> _bots = new List<KcpClient>();
+        private List<IKcpClient> _bots = new List<IKcpClient>();
         public bool IsRunning { get; private set; }
 
         public async Task StartBots(int count, string ip, int port, int startConvId, KcpConfig config)
@@ -26,6 +26,8 @@ namespace KcpProbe
                 {
                     await bot.ConnectAsync(ip, port, startConvId + i, config);
                     _bots.Add(bot);
+                    // Fire and forget, but keep task reference if needed?
+                    // Original code: _ = BotLoop(bot, i);
                     _ = BotLoop(bot, i);
                 }
                 catch
@@ -38,7 +40,7 @@ namespace KcpProbe
             }
         }
 
-        private async Task BotLoop(KcpClient bot, int index)
+        private async Task BotLoop(IKcpClient bot, int index)
         {
             while (IsRunning && bot.IsConnected)
             {
@@ -49,7 +51,7 @@ namespace KcpProbe
                         Content = $"Bot{index}", 
                         SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() 
                     };
-                    await bot.SendAsync(1, ping);
+                    await bot.SendAsync(KcpConstants.MessageIds.Ping, ping);
                     await Task.Delay(100); // 10Hz
                 }
                 catch

@@ -1,340 +1,178 @@
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.WinUI.Collections;
 using Kcp.Core;
 using KcpServer;
+using KcpProbe.Models;
+using KcpProbe.Services;
 using Microsoft.UI.Dispatching;
-using System.Linq;
 
 namespace KcpProbe.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public partial class MainViewModel : ObservableObject
     {
-        private KcpClient _client;
-        private DispatcherQueue _dispatcher;
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private string _serverIp = KcpConstants.Config.DefaultIp;
-        public string ServerIp
-        {
-            get => _serverIp;
-            set { _serverIp = value; OnPropertyChanged(nameof(ServerIp)); }
-        }
-
-        private int _serverPort = KcpConstants.Config.DefaultPort;
-        public int ServerPort
-        {
-            get => _serverPort;
-            set { _serverPort = value; OnPropertyChanged(nameof(ServerPort)); }
-        }
-
-        private int _convId = KcpConstants.Config.DefaultConvId;
-        public int ConvId
-        {
-            get => _convId;
-            set { _convId = value; OnPropertyChanged(nameof(ConvId)); }
-        }
-
-        #region KCP Config
-        private bool _noDelay = KcpConstants.Config.DefaultNoDelay;
-        public bool NoDelay { get => _noDelay; set { _noDelay = value; OnPropertyChanged(nameof(NoDelay)); } }
-
-        private int _interval = KcpConstants.Config.DefaultInterval;
-        public int Interval { get => _interval; set { _interval = value; OnPropertyChanged(nameof(Interval)); } }
-
-        private int _resend = KcpConstants.Config.DefaultResend;
-        public int Resend { get => _resend; set { _resend = value; OnPropertyChanged(nameof(Resend)); } }
-
-        private bool _nc = KcpConstants.Config.DefaultNc;
-        public bool Nc { get => _nc; set { _nc = value; OnPropertyChanged(nameof(Nc)); } }
-
-        private int _sndWnd = KcpConstants.Config.DefaultSndWnd;
-        public int SndWnd { get => _sndWnd; set { _sndWnd = value; OnPropertyChanged(nameof(SndWnd)); } }
-
-        private int _rcvWnd = KcpConstants.Config.DefaultRcvWnd;
-        public int RcvWnd { get => _rcvWnd; set { _rcvWnd = value; OnPropertyChanged(nameof(RcvWnd)); } }
+        private readonly DispatcherQueue _dispatcher;
+        private readonly PacketDispatcher _packetDispatcher;
         
-        private string _statsInfo = "WaitSnd: 0 | Unacked: 0 | RTO: 0";
-        public string StatsInfo { get => _statsInfo; set { _statsInfo = value; OnPropertyChanged(nameof(StatsInfo)); } }
-        #endregion
+        // Services
+        private readonly IKcpClient _kcpClient;
+        private readonly ConnectionService _connectionService;
+        private readonly StressTestService _stressTestService;
+        private readonly RegressionService _regressionService;
 
-        #region Status & Health
-        private string _connectionStatus = KcpConstants.ConnectionStatus.Disconnected;
-        public string ConnectionStatus
-        {
-            get => _connectionStatus;
-            set { _connectionStatus = value; OnPropertyChanged(nameof(ConnectionStatus)); OnPropertyChanged(nameof(StatusColor)); }
-        }
+        // Child ViewModels
+        public KcpConfigViewModel Config { get; } = new KcpConfigViewModel();
+        public KcpStatusViewModel Status { get; } = new KcpStatusViewModel();
+        public BotViewModel Bot { get; }
 
-        private string _healthStatus = KcpConstants.HealthStatus.Unknown;
-        public string HealthStatus
-        {
-            get => _healthStatus;
-            set { _healthStatus = value; OnPropertyChanged(nameof(HealthStatus)); OnPropertyChanged(nameof(HealthColor)); }
-        }
+        // Connection Params
+        [ObservableProperty] private string _serverIp = KcpConstants.Config.DefaultIp;
+        [ObservableProperty] private int _serverPort = KcpConstants.Config.DefaultPort;
+        [ObservableProperty] private int _convId = KcpConstants.Config.DefaultConvId;
 
-        public string StatusColor => ConnectionStatus switch
-        {
-            KcpConstants.ConnectionStatus.Connected => "LightGreen",
-            KcpConstants.ConnectionStatus.Connecting => "Yellow",
-            _ => "Red"
-        };
+        // Logging
+        private readonly ObservableCollection<LogEntry> _allLogs = new ObservableCollection<LogEntry>();
+        public AdvancedCollectionView LogsView { get; }
 
-        public string HealthColor => HealthStatus switch
-        {
-            KcpConstants.HealthStatus.Good => "LightGreen",
-            KcpConstants.HealthStatus.Fair => "Yellow",
-            KcpConstants.HealthStatus.Poor => "Orange",
-            KcpConstants.HealthStatus.Critical => "Red",
-            _ => "Gray"
-        };
+        [ObservableProperty]
+        private string _filterKeyword = "";
 
-        private long _lastPongTime = 0;
-        #endregion
+        [ObservableProperty]
+        private bool _showErrorsOnly;
 
-        // Bots
-        private BotManager _botManager = new BotManager();
-        private int _botCount = 10;
-        public int BotCount { get => _botCount; set { _botCount = value; OnPropertyChanged(nameof(BotCount)); } }
-        public bool IsRunningBots => _botManager.IsRunning;
-        public string BotButtonText => IsRunningBots ? "Stop Bots" : "Start Bots";
+        partial void OnFilterKeywordChanged(string value) => LogsView.Refresh();
+        partial void OnShowErrorsOnlyChanged(bool value) => LogsView.Refresh();
 
-        public async void ToggleBots()
-        {
-            if (_botManager.IsRunning)
-            {
-                _botManager.StopBots();
-            }
-            else
-            {
-                var config = new KcpConfig 
-                {
-                     NoDelay = NoDelay, Interval = Interval, Resend = Resend, Nc = Nc, SndWnd = SndWnd, RcvWnd = RcvWnd
-                };
-                // Start bots with offset ConvId to avoid collision with main client
-                await _botManager.StartBots(BotCount, ServerIp, ServerPort, ConvId + 100, config);
-            }
-            OnPropertyChanged(nameof(IsRunningBots));
-            OnPropertyChanged(nameof(BotButtonText));
-        }
+        // Interface Test
+        [ObservableProperty] private string _pingContent = "Hello KCP";
+        [ObservableProperty] private string _apiMethod = "TestApi";
+        [ObservableProperty] private string _apiParams = "{}";
 
-        // Visualization
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(StressButtonText))]
+        private bool _isStressing;
+
+        public string StressButtonText => IsStressing ? "Stop Stress" : "Start Stress";
+
+        // Events
         public event Action<double>? RttUpdated;
-
-        private bool _isConnected;
-        public bool IsConnected
-        {
-            get => _isConnected;
-            set { _isConnected = value; OnPropertyChanged(nameof(IsConnected)); OnPropertyChanged(nameof(ConnectButtonText)); }
-        }
-
-        public string ConnectButtonText => IsConnected ? "Disconnect" : "Connect";
-
-        private string _pingContent = "Hello KCP";
-        public string PingContent
-        {
-            get => _pingContent;
-            set { _pingContent = value; OnPropertyChanged(nameof(PingContent)); }
-        }
-
-        public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
 
         public MainViewModel()
         {
             _dispatcher = DispatcherQueue.GetForCurrentThread();
-            _client = new KcpClient();
-            _client.OnLog += Log;
-            _client.OnConnected += () => 
-            { 
-                IsConnected = true; 
-                Log("Connected");
-                ConnectionStatus = KcpConstants.ConnectionStatus.Connected;
-                HealthStatus = KcpConstants.HealthStatus.Checking;
-                _lastPongTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            };
-            _client.OnDisconnected += () => 
-            { 
-                IsConnected = false; 
-                Log("Disconnected"); 
-                ConnectionStatus = KcpConstants.ConnectionStatus.Disconnected;
-                HealthStatus = KcpConstants.HealthStatus.Unknown;
-            };
-            _client.OnMessageReceived += OnMessageReceived;
+            _packetDispatcher = new PacketDispatcher();
+            _kcpClient = new KcpClient();
 
-            PacketDispatcher.Instance.RegisterHandler(KcpConstants.MessageIds.Pong, OnPong); // Register Pong handler
-            PacketDispatcher.Instance.RegisterHandler(KcpConstants.MessageIds.RpcResponse, OnRpcResponse); // Register RpcResponse handler
-        }
-
-        private void OnMessageReceived(byte[] data)
-        {
-            PacketDispatcher.Instance.Dispatch(data);
-        }
-
-        private void OnPong(BaseMessage msg)
-        {
-            _lastPongTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            
-            var pong = PacketDispatcher.Instance.ParsePayload<Pong>(msg);
-            
-            // Handle both standard Probe:{ts} and server echoed Pong: Probe:{ts}
-            string content = pong.Content;
-            int probeIndex = content.IndexOf("Probe:");
-            
-            if (probeIndex >= 0)
+            // Initialize Logs View
+            LogsView = new AdvancedCollectionView(_allLogs, true);
+            LogsView.Filter = item =>
             {
-                string tsStr = content.Substring(probeIndex + 6);
-                // Extract digits only in case there are suffixes
-                var digits = new string(tsStr.TakeWhile(char.IsDigit).ToArray());
-                
-                if (long.TryParse(digits, out long sendTime))
+                if (item is not LogEntry log) return false;
+
+                if (ShowErrorsOnly && log.Level != LogLevel.Error)
+                    return false;
+
+                if (!string.IsNullOrWhiteSpace(FilterKeyword))
                 {
-                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    var rtt = now - sendTime;
-                    // Filter unrealistic RTTs (e.g. clock sync issues)
-                    if (rtt >= 0 && rtt < 10000) 
-                    {
-                        _dispatcher.TryEnqueue(() => RttUpdated?.Invoke(rtt));
-                    }
+                    if (!log.Message.Contains(FilterKeyword, StringComparison.OrdinalIgnoreCase))
+                        return false;
                 }
-            }
 
-            Log($"Recv Pong: {pong.Content}, ServerTime: {pong.RecvTime}");
-        }
+                return true;
+            };
+            
+            // Log forwarding
+            _kcpClient.OnLog += Log;
 
-        private void OnRpcResponse(BaseMessage msg)
-        {
-            var resp = PacketDispatcher.Instance.ParsePayload<RpcResponse>(msg);
-            Log($"Recv RPC: {resp.Method} Code:{resp.Code} Result:{resp.Result} Error:{resp.ErrorMessage}");
-        }
+            // Initialize Services
+            _connectionService = new ConnectionService(_kcpClient, _packetDispatcher);
+            _connectionService.StatsUpdated += stats => _dispatcher.TryEnqueue(() => Status.UpdateStats(stats));
+            _connectionService.HealthStatusChanged += status => _dispatcher.TryEnqueue(() => Status.HealthStatus = status);
+            _connectionService.RttUpdated += rtt => _dispatcher.TryEnqueue(() => RttUpdated?.Invoke(rtt));
 
-        private string _apiMethod = "TestApi";
-        public string ApiMethod
-        {
-            get => _apiMethod;
-            set { _apiMethod = value; OnPropertyChanged(nameof(ApiMethod)); }
-        }
+            _stressTestService = new StressTestService(_kcpClient);
+            _stressTestService.Log += Log;
+            _stressTestService.IsStressingChanged += isStressing => _dispatcher.TryEnqueue(() => IsStressing = isStressing);
 
-        private string _apiParams = "{}";
-        public string ApiParams
-        {
-            get => _apiParams;
-            set { _apiParams = value; OnPropertyChanged(nameof(ApiParams)); }
-        }
-
-        public async void SendRpc()
-        {
-            if (!IsConnected)
+            _regressionService = new RegressionService();
+            _regressionService.Log += Log;
+            _regressionService.IsRunningChanged += running => _dispatcher.TryEnqueue(() => 
             {
-                Log("Not connected");
-                return;
-            }
+                 OnPropertyChanged(nameof(IsRunningRegression));
+                 OnPropertyChanged(nameof(RunRegressionButtonText));
+                 RunRegressionCommand.NotifyCanExecuteChanged();
+                 StopRegressionCommand.NotifyCanExecuteChanged();
+            });
 
-            try
+            // Initialize Bot VM
+            var botManager = new BotManager(); 
+            Bot = new BotViewModel(botManager, Config, ServerIp, ServerPort, ConvId);
+        }
+
+        private void Log(string message)
+        {
+            _dispatcher.TryEnqueue(() =>
             {
-                var req = new RpcRequest
+                var level = LogLevel.Info;
+                if (message.Contains("Error", StringComparison.OrdinalIgnoreCase) || 
+                    message.Contains("Fail", StringComparison.OrdinalIgnoreCase) ||
+                    message.Contains("[REG-ERR]", StringComparison.OrdinalIgnoreCase))
                 {
-                    Method = ApiMethod,
-                    Params = ApiParams
-                };
+                    level = LogLevel.Error;
+                }
+                else if (message.Contains("Warning", StringComparison.OrdinalIgnoreCase))
+                {
+                    level = LogLevel.Warning;
+                }
+                else if (message.Contains("PASS", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("Connected", StringComparison.OrdinalIgnoreCase))
+                {
+                    level = LogLevel.Success;
+                }
 
-                await _client.SendAsync(KcpConstants.MessageIds.RpcRequest, req); // MsgId 100 is RpcRequest
-                Log($"Sent RPC: {ApiMethod} {ApiParams}");
-            }
-            catch (Exception ex)
-            {
-                Log($"Send RPC Error: {ex.Message}");
-            }
+                _allLogs.Insert(0, new LogEntry(DateTime.Now, message, level));
+                if (_allLogs.Count > 1000) _allLogs.RemoveAt(_allLogs.Count - 1);
+            });
         }
 
-
-        public async void ToggleConnect()
+        [RelayCommand]
+        public void ClearLogs()
         {
-            if (IsConnected)
+            _allLogs.Clear();
+        }
+
+        [RelayCommand]
+        private async Task ToggleConnect()
+        {
+            if (Status.IsConnected)
             {
-                _client.Disconnect();
+                _connectionService.Disconnect();
+                Status.SetConnected(false);
             }
             else
             {
-                ConnectionStatus = KcpConstants.ConnectionStatus.Connecting;
+                Status.ConnectionStatus = KcpConstants.ConnectionStatus.Connecting;
                 try
                 {
-                    var config = new KcpConfig 
-                    {
-                        NoDelay = NoDelay,
-                        Interval = Interval,
-                        Resend = Resend,
-                        Nc = Nc,
-                        SndWnd = SndWnd,
-                        RcvWnd = RcvWnd
-                    };
-                    await _client.ConnectAsync(ServerIp, ServerPort, ConvId, config);
-                    StartStatsPolling();
+                    var config = Config.GetConfig();
+                    await _connectionService.ConnectAsync(ServerIp, ServerPort, ConvId, config);
+                    Status.SetConnected(true);
                 }
                 catch (Exception ex)
                 {
                     Log($"Connect Error: {ex.Message}");
-                    ConnectionStatus = KcpConstants.ConnectionStatus.Disconnected;
+                    Status.SetConnected(false);
                 }
-            }
-        }
-        
-        private async void StartStatsPolling()
-        {
-            while (IsConnected)
-            {
-                var stats = _client.GetStats();
-                if (stats != null)
-                {
-                    _dispatcher.TryEnqueue(() => 
-                    {
-                        StatsInfo = $"WaitSnd: {stats.WaitSnd} | Unacked: {stats.Unacked} | RTO: {stats.Rto}";
-                    });
-                }
-                
-                // Probe RTT
-                try 
-                {
-                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    var ping = new Ping { Content = $"Probe:{now}", SendTime = (ulong)now };
-                    await _client.SendAsync(KcpConstants.MessageIds.Ping, ping);
-                    
-                    // Health Check
-                    long timeSinceLastPong = now - _lastPongTime;
-                    if (timeSinceLastPong > KcpConstants.Timeouts.HealthCriticalMs)
-                    {
-                        HealthStatus = KcpConstants.HealthStatus.Critical;
-                    }
-                    else if (timeSinceLastPong > KcpConstants.Timeouts.HealthPoorMs)
-                    {
-                        HealthStatus = KcpConstants.HealthStatus.Poor;
-                    }
-                    else if (timeSinceLastPong > KcpConstants.Timeouts.HealthFairMs)
-                    {
-                        HealthStatus = KcpConstants.HealthStatus.Fair;
-                    }
-                    else
-                    {
-                        HealthStatus = KcpConstants.HealthStatus.Good;
-                    }
-                }
-                catch (Exception)
-                {
-                     // Ignore send errors during polling to avoid log spam
-                }
-                
-                await Task.Delay(KcpConstants.Timeouts.StatsPollingIntervalMs);
             }
         }
 
-        public async void SendPing()
+        [RelayCommand]
+        private async Task SendPing()
         {
-            if (!IsConnected)
+            if (!Status.IsConnected)
             {
                 Log("Not connected");
                 return;
@@ -347,8 +185,7 @@ namespace KcpProbe.ViewModels
                     Content = PingContent,
                     SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                 };
-
-                await _client.SendAsync(KcpConstants.MessageIds.Ping, ping); // MsgId 1 is Ping
+                await _kcpClient.SendAsync(KcpConstants.MessageIds.Ping, ping);
                 Log($"Sent Ping: {PingContent}");
             }
             catch (Exception ex)
@@ -356,207 +193,64 @@ namespace KcpProbe.ViewModels
                 Log($"Send Error: {ex.Message}");
             }
         }
-        
-        // Stress Test Logic (Simplified)
-        private bool _isStressing;
-        private bool _isRunningRegression;
-        private bool _skipServerForRegression = true;
-        private Process? _regressionProcess;
-        private bool _regressionStopRequested;
 
-        public bool IsRunningRegression
+        [RelayCommand]
+        private async Task SendRpc()
         {
-            get => _isRunningRegression;
-            set
+            if (!Status.IsConnected)
             {
-                _isRunningRegression = value;
-                OnPropertyChanged(nameof(IsRunningRegression));
-                OnPropertyChanged(nameof(RunRegressionButtonText));
+                Log("Not connected");
+                return;
+            }
+
+            try
+            {
+                var req = new RpcRequest
+                {
+                    Method = ApiMethod,
+                    Params = ApiParams
+                };
+                await _kcpClient.SendAsync(KcpConstants.MessageIds.RpcRequest, req);
+                Log($"Sent RPC: {ApiMethod} {ApiParams}");
+            }
+            catch (Exception ex)
+            {
+                Log($"Send RPC Error: {ex.Message}");
             }
         }
 
-        public bool SkipServerForRegression
+        [RelayCommand]
+        private void ToggleStress()
         {
-            get => _skipServerForRegression;
-            set
+            if (_stressTestService.IsStressing)
             {
-                _skipServerForRegression = value;
-                OnPropertyChanged(nameof(SkipServerForRegression));
+                _stressTestService.StopStress();
+            }
+            else
+            {
+                _ = _stressTestService.StartStressAsync();
             }
         }
 
+        // Regression
+        public bool IsRunningRegression => _regressionService.IsRunningRegression;
         public string RunRegressionButtonText => IsRunningRegression ? "Running..." : "Run All Tests";
+        [ObservableProperty] private bool _skipServerForRegression = true;
 
-        public async void ToggleStress()
+        [RelayCommand(CanExecute = nameof(CanRunRegression))]
+        private async Task RunRegression()
         {
-             if (_isStressing)
-             {
-                 _isStressing = false;
-                 Log("Stopping Stress Test...");
-                 return;
-             }
-             
-             if (!IsConnected)
-             {
-                 Log("Please connect first");
-                 return;
-             }
-
-             _isStressing = true;
-             Log("Starting Stress Test...");
-             
-             int count = 0;
-             while (_isStressing && IsConnected)
-             {
-                 var ping = new Ping { Content = $"Stress {count++}", SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
-                 await _client.SendAsync(KcpConstants.MessageIds.Ping, ping);
-                 await Task.Delay(KcpConstants.Timeouts.StressIntervalMs); // 100 QPS roughly per thread
-             }
-             _isStressing = false;
+             await _regressionService.StartRegressionAsync(ServerIp, ServerPort, ConvId, SkipServerForRegression);
         }
 
-        public async void RunRegression()
+        private bool CanRunRegression() => !IsRunningRegression;
+
+        [RelayCommand(CanExecute = nameof(CanStopRegression))]
+        private void StopRegression()
         {
-            if (IsRunningRegression)
-            {
-                return;
-            }
-
-            var scriptPath = ResolveRegressionScriptPath();
-            if (string.IsNullOrWhiteSpace(scriptPath))
-            {
-                Log($"Regression script not found: {KcpConstants.Scripts.RegressionScript}");
-                return;
-            }
-
-            IsRunningRegression = true;
-            _regressionStopRequested = false;
-            try
-            {
-                Log("Starting regression...");
-                var args = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -Ip {ServerIp} -Port {ServerPort} -Conv {ConvId}";
-                if (SkipServerForRegression)
-                {
-                    args += " -SkipServer";
-                }
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell",
-                    Arguments = args,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    CreateNoWindow = true
-                };
-
-                var process = new Process { StartInfo = psi };
-                _regressionProcess = process;
-                process.OutputDataReceived += (_, e) =>
-                {
-                    if (!string.IsNullOrWhiteSpace(e.Data))
-                    {
-                        Log($"[REG] {e.Data}");
-                    }
-                };
-                process.ErrorDataReceived += (_, e) =>
-                {
-                    if (!string.IsNullOrWhiteSpace(e.Data))
-                    {
-                        Log($"[REG-ERR] {e.Data}");
-                    }
-                };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                await process.WaitForExitAsync();
-
-                if (_regressionStopRequested)
-                {
-                    Log("Regression stopped by user");
-                }
-                else if (process.ExitCode == 0)
-                {
-                    Log("Regression finished: PASS");
-                }
-                else
-                {
-                    Log($"Regression finished: FAIL (ExitCode={process.ExitCode})");
-                }
-
-                process.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Log($"Regression Error: {ex.Message}");
-            }
-            finally
-            {
-                _regressionProcess = null;
-                _regressionStopRequested = false;
-                IsRunningRegression = false;
-            }
+            _regressionService.StopRegression();
         }
 
-        public void StopRegression()
-        {
-            if (!IsRunningRegression || _regressionProcess == null)
-            {
-                return;
-            }
-
-            try
-            {
-                if (!_regressionProcess.HasExited)
-                {
-                    _regressionStopRequested = true;
-                    Log("Stopping regression...");
-                    _regressionProcess.Kill(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"Stop regression error: {ex.Message}");
-            }
-        }
-
-        private string? ResolveRegressionScriptPath()
-        {
-            var current = new DirectoryInfo(AppContext.BaseDirectory);
-            for (var i = 0; i < 8 && current != null; i++)
-            {
-                var candidate = Path.Combine(current.FullName, KcpConstants.Scripts.RegressionScript);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                current = current.Parent;
-            }
-
-            return null;
-        }
-
-        private void Log(string message)
-        {
-            _dispatcher.TryEnqueue(() =>
-            {
-                Logs.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
-                if (Logs.Count > 100) Logs.RemoveAt(Logs.Count - 1);
-            });
-        }
-
-        public void ClearLogs()
-        {
-            _dispatcher.TryEnqueue(() => Logs.Clear());
-        }
-
-        private void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
+        private bool CanStopRegression() => IsRunningRegression;
     }
 }

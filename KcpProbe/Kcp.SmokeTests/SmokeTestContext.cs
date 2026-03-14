@@ -9,6 +9,7 @@ internal sealed class SmokeTestContext : IDisposable
 {
     private readonly ConcurrentDictionary<uint, ConcurrentQueue<BaseMessage>> _messageQueues = new();
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+    private readonly PacketDispatcher _dispatcher = new PacketDispatcher();
 
     public SmokeTestContext(SmokeTestOptions options)
     {
@@ -16,6 +17,7 @@ internal sealed class SmokeTestContext : IDisposable
         Client = new KcpClient();
         Client.OnMessageReceived += OnMessageReceived;
         Client.OnLog += m => Console.WriteLine($"[KcpClient] {m}");
+        _dispatcher.OnMessageDispatch += OnMessageDispatched;
     }
 
     public SmokeTestOptions Options { get; }
@@ -23,15 +25,13 @@ internal sealed class SmokeTestContext : IDisposable
 
     private void OnMessageReceived(byte[] data)
     {
-        try
-        {
-            var baseMessage = BaseMessage.Parser.ParseFrom(data);
-            var queue = _messageQueues.GetOrAdd(baseMessage.MsgId, _ => new ConcurrentQueue<BaseMessage>());
-            queue.Enqueue(baseMessage);
-        }
-        catch
-        {
-        }
+        _dispatcher.Dispatch(data);
+    }
+
+    private void OnMessageDispatched(BaseMessage baseMessage)
+    {
+        var queue = _messageQueues.GetOrAdd(baseMessage.MsgId, _ => new ConcurrentQueue<BaseMessage>());
+        queue.Enqueue(baseMessage);
     }
 
     public async Task ConnectAsync(CancellationToken cancellationToken)

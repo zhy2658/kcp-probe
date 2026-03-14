@@ -48,33 +48,36 @@
                     <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
                     <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
                     <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
-                    <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
+                    <Button Content="{Binding Status.ConnectButtonText}" Command="{Binding ToggleConnectCommand}" VerticalAlignment="Bottom"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20" VerticalAlignment="Bottom" Margin="20,0,0,5">
-                    <TextBlock Text="{Binding StatsInfo}" Foreground="LightGreen" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding Status.StatsInfo}" Foreground="LightGreen" FontWeight="Bold"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="15" VerticalAlignment="Bottom" Margin="0,0,10,5">
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="Status:" Foreground="Gray"/>
-                        <TextBlock Text="{Binding ConnectionStatus}" Foreground="{Binding StatusColor}" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Status.ConnectionStatus}" Foreground="{Binding Status.StatusColor}" FontWeight="Bold"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="Health:" Foreground="Gray"/>
-                        <TextBlock Text="{Binding HealthStatus}" Foreground="{Binding HealthColor}" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Status.HealthStatus}" Foreground="{Binding Status.HealthColor}" FontWeight="Bold"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                         <TextBlock Text="v1.0.1" Foreground="Gray" FontSize="11" VerticalAlignment="Bottom"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
             
             <Expander Header="Advanced KCP Settings" HorizontalAlignment="Stretch" IsExpanded="False" Margin="10,0,10,10">
                 <StackPanel Orientation="Horizontal" Spacing="20" Padding="10">
-                    <CheckBox Content="NoDelay" IsChecked="{Binding NoDelay, Mode=TwoWay}"/>
-                    <NumberBox Header="Interval (ms)" Value="{Binding Interval, Mode=TwoWay}" Width="100"/>
-                    <NumberBox Header="Resend" Value="{Binding Resend, Mode=TwoWay}" Width="80"/>
-                    <CheckBox Content="NC (Flow Control)" IsChecked="{Binding Nc, Mode=TwoWay}"/>
-                    <NumberBox Header="SndWnd" Value="{Binding SndWnd, Mode=TwoWay}" Width="80"/>
-                    <NumberBox Header="RcvWnd" Value="{Binding RcvWnd, Mode=TwoWay}" Width="80"/>
+                    <CheckBox Content="NoDelay" IsChecked="{Binding Config.NoDelay, Mode=TwoWay}"/>
+                    <NumberBox Header="Interval (ms)" Value="{Binding Config.Interval, Mode=TwoWay}" Width="100"/>
+                    <NumberBox Header="Resend" Value="{Binding Config.Resend, Mode=TwoWay}" Width="80"/>
+                    <CheckBox Content="NC (Flow Control)" IsChecked="{Binding Config.Nc, Mode=TwoWay}"/>
+                    <NumberBox Header="SndWnd" Value="{Binding Config.SndWnd, Mode=TwoWay}" Width="80"/>
+                    <NumberBox Header="RcvWnd" Value="{Binding Config.RcvWnd, Mode=TwoWay}" Width="80"/>
                 </StackPanel>
             </Expander>
         </StackPanel>
@@ -89,15 +92,16 @@
             <!-- Simplified Content for now without navigation logic overhead -->
             <Grid Padding="10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*" MinWidth="300"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*" MinWidth="300"/>
                     </Grid.ColumnDefinitions>
                     
                     <!-- Left: Interface Test -->
                     <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,10,0">
                         <TextBlock Text="Interface Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
                         <TextBox Header="Ping Content" Text="{Binding PingContent, Mode=TwoWay}"/>
-                        <Button Content="Send Ping" Click="SendPing_Click"/>
+                        <Button Content="Send Ping" Command="{Binding SendPingCommand}"/>
 
                         <!-- RPC Section -->
                         <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
@@ -105,21 +109,25 @@
                                 <TextBlock Text="RPC Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
                                 <TextBox Header="Method" Text="{Binding ApiMethod, Mode=TwoWay}"/>
                                 <TextBox Header="Params (JSON)" Text="{Binding ApiParams, Mode=TwoWay}" Height="100" AcceptsReturn="True" TextWrapping="Wrap"/>
-                                <Button Content="Call API" Click="CallApi_Click"/>
+                                <Button Content="Call API" Command="{Binding SendRpcCommand}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
 
+                    <!-- Splitter -->
+                    <local:ResizeHandleBorder Grid.Column="1" Width="5" Cursor="SizeWestEast" Background="#404040" Margin="0,0,10,0"
+                        PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerCaptureLost="Splitter_PointerCaptureLost"/>
+
                     <!-- Right: Stress Test & Bots & Monitor -->
-                    <StackPanel Grid.Column="1" Spacing="10" Margin="10,0,0,0" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10,0,0,0">
+                    <StackPanel Grid.Column="2" Spacing="10" Margin="0,0,0,0" Padding="10,0,0,0">
                         <TextBlock Text="Stress Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
                         <TextBlock Text="Simple Stress Test (100 QPS)"/>
-                        <Button Content="Start/Stop Stress" Click="Stress_Click"/>
+                        <Button Content="{Binding StressButtonText}" Command="{Binding ToggleStressCommand}"/>
 
                         <TextBlock Text="Bot Swarm" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,10,0,0"/>
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                             <NumberBox Header="Count" Value="{Binding BotCount, Mode=TwoWay}" Width="100"/>
-                             <Button Content="{Binding BotButtonText}" Click="Bot_Click" VerticalAlignment="Bottom"/>
+                             <NumberBox Header="Count" Value="{Binding Bot.BotCount, Mode=TwoWay}" Width="100"/>
+                             <Button Content="{Binding Bot.BotButtonText}" Command="{Binding Bot.ToggleBotsCommand}" VerticalAlignment="Bottom"/>
                         </StackPanel>
                         
                         <TextBlock Text="RTT Monitor (ms)" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,10,0,0"/>
@@ -137,8 +145,8 @@
                                 <TextBlock Text="Test Management" Style="{StaticResource SubtitleTextBlockStyle}"/>
                                 <CheckBox Content="Skip server startup" IsChecked="{Binding SkipServerForRegression, Mode=TwoWay}"/>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="{Binding RunRegressionButtonText}" Click="RunRegression_Click"/>
-                                    <Button Content="Stop" Click="StopRegression_Click" IsEnabled="{Binding IsRunningRegression}"/>
+                                    <Button Content="{Binding RunRegressionButtonText}" Command="{Binding RunRegressionCommand}"/>
+                                    <Button Content="Stop" Command="{Binding StopRegressionCommand}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -160,15 +168,27 @@
 
         <!-- Footer: Logs -->
         <Grid Grid.Row="4" Background="Black">
-            <StackPanel Canvas.ZIndex="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Spacing="8" Margin="8,6,8,0">
-                <Button Content="Copy Selected" Click="CopySelectedLogs_Click"/>
-                <Button Content="Copy All" Click="CopyAllLogs_Click"/>
-                <Button Content="Clear" Click="ClearLogs_Click"/>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Filter Controls -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="5,2,5,2">
+                <TextBox PlaceholderText="Search logs..." Text="{Binding FilterKeyword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="200" VerticalAlignment="Center"/>
+                <CheckBox Content="Errors Only" IsChecked="{Binding ShowErrorsOnly, Mode=TwoWay}" VerticalAlignment="Center" Foreground="White"/>
             </StackPanel>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8" Margin="8,2,8,2">
+                <Button Content="Copy Selected" Click="CopySelectedLogs_Click" FontSize="11"/>
+                <Button Content="Copy All" Click="CopyAllLogs_Click" FontSize="11"/>
+                <Button Content="Clear" Command="{Binding ClearLogsCommand}" FontSize="11"/>
+            </StackPanel>
+
             <ListView
+                Grid.Row="1"
                 x:Name="LogsListView"
-                ItemsSource="{Binding Logs}"
-                Foreground="LightGreen"
+                ItemsSource="{Binding LogsView}"
                 FontFamily="Consolas"
                 SelectionMode="Extended">
                 <ListView.ItemContainerStyle>
@@ -180,7 +200,10 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding}" Margin="0" Padding="0" LineHeight="16" IsTextSelectionEnabled="True"/>
+                         <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="{Binding FormattedTime}" Foreground="Gray" FontSize="12"/>
+                            <TextBlock Text="{Binding Message}" Foreground="{Binding Color}" FontSize="12" IsTextSelectionEnabled="True"/>
+                        </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>

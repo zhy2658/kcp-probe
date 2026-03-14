@@ -13,6 +13,8 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
+using KcpProbe.Models;
+
 namespace KcpProbe
 {
     public sealed partial class MainWindow : Window
@@ -103,11 +105,6 @@ namespace KcpProbe
             _rttLine.Points = points;
         }
 
-        private void Bot_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.ToggleBots();
-        }
-
         private void UpdateTitleBarInsets()
         {
             if (_appWindow == null)
@@ -119,26 +116,6 @@ namespace KcpProbe
             RightPaddingColumn.Width = new GridLength(_appWindow.TitleBar.RightInset);
         }
 
-        private void SendPing_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.SendPing();
-        }
-
-        private void Stress_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.ToggleStress();
-        }
-
-        private void Connect_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.ToggleConnect();
-        }
-
-        private void CallApi_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.SendRpc();
-        }
-
         private void PinTopButton_Click(object sender, RoutedEventArgs e)
         {
             if (_presenter == null)
@@ -148,16 +125,6 @@ namespace KcpProbe
 
             _presenter.IsAlwaysOnTop = !_presenter.IsAlwaysOnTop;
             PinTopIcon.Symbol = _presenter.IsAlwaysOnTop ? Symbol.UnPin : Symbol.Pin;
-        }
-
-        private void RunRegression_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.RunRegression();
-        }
-
-        private void StopRegression_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.StopRegression();
         }
 
         private void LogResizeHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -205,6 +172,58 @@ namespace KcpProbe
             LogResizeHandle.ReleasePointerCaptures();
         }
 
+        private bool _isDraggingSplitter;
+        private double _dragStartX;
+        private double _leftColStartWidth;
+        private double _rightColStartWidth;
+
+        private void Splitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            var element = sender as FrameworkElement;
+            if (element == null) return;
+            
+            _isDraggingSplitter = true;
+            _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            var grid = element.Parent as Grid;
+            if (grid == null) return;
+            
+            _leftColStartWidth = grid.ColumnDefinitions[0].ActualWidth;
+            _rightColStartWidth = grid.ColumnDefinitions[2].ActualWidth;
+            element.CapturePointer(e.Pointer);
+        }
+
+        private void Splitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isDraggingSplitter) return;
+
+            var currentX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            var delta = currentX - _dragStartX;
+            var element = sender as FrameworkElement;
+            if (element == null) return;
+            
+            var grid = element.Parent as Grid;
+            if (grid == null) return;
+
+            var newLeftWidth = _leftColStartWidth + delta;
+            var newRightWidth = _rightColStartWidth - delta;
+
+            if (newLeftWidth < 300 || newRightWidth < 300) return;
+
+            grid.ColumnDefinitions[0].Width = new GridLength(newLeftWidth, GridUnitType.Pixel);
+            grid.ColumnDefinitions[2].Width = new GridLength(newRightWidth, GridUnitType.Pixel);
+        }
+
+        private void Splitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            _isDraggingSplitter = false;
+            (sender as UIElement)?.ReleasePointerCaptures();
+        }
+
+        private void Splitter_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            _isDraggingSplitter = false;
+        }
+
         private void LogResizeHandle_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
         {
             _isDraggingLogPanel = false;
@@ -212,7 +231,7 @@ namespace KcpProbe
 
         private void CopySelectedLogs_Click(object sender, RoutedEventArgs e)
         {
-            var selected = LogsListView.SelectedItems.OfType<string>().ToList();
+            var selected = LogsListView.SelectedItems.OfType<LogEntry>().Select(l => l.Message).ToList();
             if (selected.Count == 0)
             {
                 return;
@@ -225,19 +244,16 @@ namespace KcpProbe
 
         private void CopyAllLogs_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel.Logs.Count == 0)
+            // Access LogsView directly
+            if (ViewModel.LogsView.Count == 0)
             {
                 return;
             }
 
+            var logs = ViewModel.LogsView.OfType<LogEntry>().Select(l => l.Message);
             var package = new DataPackage();
-            package.SetText(string.Join(Environment.NewLine, ViewModel.Logs));
+            package.SetText(string.Join(Environment.NewLine, logs));
             Clipboard.SetContent(package);
-        }
-
-        private void ClearLogs_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.ClearLogs();
         }
     }
 }
