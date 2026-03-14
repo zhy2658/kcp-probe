@@ -18,6 +18,7 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <StartupObject>KcpProbe.Program</StartupObject>
     <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <DefaultItemExcludes>$(DefaultItemExcludes);Kcp.Core\**;Kcp.SmokeTests\**</DefaultItemExcludes>
     <Version>1.0.1</Version>
   </PropertyGroup>
@@ -50,7 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="CommunityToolkit.WinUI.Collections" Version="8.2.251219" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
   </ItemGroup>
@@ -72,7 +72,7 @@
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">False</PublishReadyToRun>
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">False</PublishTrimmed>
     <!-- Disable PublishSingleFile to avoid MSB3073 error in Unpackaged mode -->
     <PublishSingleFile>false</PublishSingleFile>
     <!-- EnableCompressionInSingleFile is irrelevant if PublishSingleFile is false, but keeping it doesn't hurt -->

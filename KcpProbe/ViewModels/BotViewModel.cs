@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kcp.Core;
+using System;
 using System.Threading.Tasks;
 
 namespace KcpProbe.ViewModels
@@ -9,17 +10,13 @@ namespace KcpProbe.ViewModels
     {
         private readonly BotManager _botManager;
         private readonly KcpConfigViewModel _configVm;
-        private readonly string _serverIp;
-        private readonly int _serverPort;
-        private readonly int _startConvId;
+        private readonly Func<(string ip, int port, int convId)> _endpointProvider;
 
-        public BotViewModel(BotManager botManager, KcpConfigViewModel configVm, string serverIp, int serverPort, int startConvId)
+        public BotViewModel(BotManager botManager, KcpConfigViewModel configVm, Func<(string ip, int port, int convId)> endpointProvider)
         {
             _botManager = botManager;
             _configVm = configVm;
-            _serverIp = serverIp;
-            _serverPort = serverPort;
-            _startConvId = startConvId;
+            _endpointProvider = endpointProvider;
         }
 
         [ObservableProperty]
@@ -42,8 +39,8 @@ namespace KcpProbe.ViewModels
             else
             {
                 var config = _configVm.GetConfig();
-                // Start bots with offset ConvId to avoid collision with main client
-                await _botManager.StartBots(BotCount, _serverIp, _serverPort, _startConvId + 100, config);
+                var endpoint = _endpointProvider.Invoke();
+                await _botManager.StartBots(BotCount, endpoint.ip, endpoint.port, endpoint.convId + 100, config);
                 IsRunningBots = true;
             }
         }

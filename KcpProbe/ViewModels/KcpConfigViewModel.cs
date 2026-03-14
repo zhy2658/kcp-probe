@@ -33,7 +33,7 @@ namespace KcpProbe.ViewModels
                 Nc = Nc,
                 SndWnd = SndWnd,
                 RcvWnd = RcvWnd,
-                Mtu = KcpConstants.Config.DefaultMtu // Mtu wasn't exposed in UI
+                Mtu = KcpConstants.Config.DefaultMtu
             };
         }
     }

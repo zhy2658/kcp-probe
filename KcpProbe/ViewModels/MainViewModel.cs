@@ -1,9 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.WinUI.Collections;
 using Kcp.Core;
 using KcpServer;
 using KcpProbe.Models;
@@ -15,38 +15,28 @@ namespace KcpProbe.ViewModels
     public partial class MainViewModel : ObservableObject
     {
         private readonly DispatcherQueue _dispatcher;
-        private readonly PacketDispatcher _packetDispatcher;
-        
-        // Services
         private readonly IKcpClient _kcpClient;
         private readonly ConnectionService _connectionService;
         private readonly StressTestService _stressTestService;
         private readonly RegressionService _regressionService;
 
-        // Child ViewModels
         public KcpConfigViewModel Config { get; } = new KcpConfigViewModel();
         public KcpStatusViewModel Status { get; } = new KcpStatusViewModel();
         public BotViewModel Bot { get; }
 
-        // Connection Params
         [ObservableProperty] private string _serverIp = KcpConstants.Config.DefaultIp;
         [ObservableProperty] private int _serverPort = KcpConstants.Config.DefaultPort;
         [ObservableProperty] private int _convId = KcpConstants.Config.DefaultConvId;
 
-        // Logging
         private readonly ObservableCollection<LogEntry> _allLogs = new ObservableCollection<LogEntry>();
-        public AdvancedCollectionView LogsView { get; }
+        public ObservableCollection<LogEntry> LogsView { get; } = new ObservableCollection<LogEntry>();
 
-        [ObservableProperty]
-        private string _filterKeyword = "";
+        [ObservableProperty] private string _filterKeyword = "";
+        [ObservableProperty] private bool _showErrorsOnly;
 
-        [ObservableProperty]
-        private bool _showErrorsOnly;
+        partial void OnFilterKeywordChanged(string value) => RefreshLogsView();
+        partial void OnShowErrorsOnlyChanged(bool value) => RefreshLogsView();
 
-        partial void OnFilterKeywordChanged(string value) => LogsView.Refresh();
-        partial void OnShowErrorsOnlyChanged(bool value) => LogsView.Refresh();
-
-        // Interface Test
         [ObservableProperty] private string _pingContent = "Hello KCP";
         [ObservableProperty] private string _apiMethod = "TestApi";
         [ObservableProperty] private string _apiParams = "{}";
@@ -57,82 +47,93 @@ namespace KcpProbe.ViewModels
 
         public string StressButtonText => IsStressing ? "Stop Stress" : "Start Stress";
 
-        // Events
         public event Action<double>? RttUpdated;
 
-        public MainViewModel()
+        public MainViewModel(
+            IKcpClient kcpClient,
+            ConnectionService connectionService,
+            StressTestService stressTestService,
+            RegressionService regressionService,
+            BotManager botManager)
         {
             _dispatcher = DispatcherQueue.GetForCurrentThread();
-            _packetDispatcher = new PacketDispatcher();
-            _kcpClient = new KcpClient();
+            _kcpClient = kcpClient;
+            _connectionService = connectionService;
+            _stressTestService = stressTestService;
+            _regressionService = regressionService;
 
-            // Initialize Logs View
-            LogsView = new AdvancedCollectionView(_allLogs, true);
-            LogsView.SortDescriptions.Add(new SortDescription("Time", SortDirection.Descending));
-            LogsView.Filter = item =>
-            {
-                if (item is not LogEntry log) return false;
-
-                if (ShowErrorsOnly && log.Level != LogLevel.Error)
-                    return false;
-
-                if (!string.IsNullOrWhiteSpace(FilterKeyword))
-                {
-                    if (!log.Message.Contains(FilterKeyword, StringComparison.OrdinalIgnoreCase))
-                        return false;
-                }
-
-                return true;
-            };
-            
-            // Log forwarding
             _kcpClient.OnLog += Log;
-
-            // Initialize Services
-            _connectionService = new ConnectionService(_kcpClient, _packetDispatcher);
             _connectionService.StatsUpdated += stats => _dispatcher.TryEnqueue(() => Status.UpdateStats(stats));
             _connectionService.HealthStatusChanged += status => _dispatcher.TryEnqueue(() => Status.HealthStatus = status);
             _connectionService.RttUpdated += rtt => _dispatcher.TryEnqueue(() => RttUpdated?.Invoke(rtt));
 
-            _stressTestService = new StressTestService(_kcpClient);
             _stressTestService.Log += Log;
             _stressTestService.IsStressingChanged += isStressing => _dispatcher.TryEnqueue(() => IsStressing = isStressing);
 
-            _regressionService = new RegressionService();
             _regressionService.Log += Log;
-            _regressionService.IsRunningChanged += running => _dispatcher.TryEnqueue(() => 
+            _regressionService.IsRunningChanged += _ => _dispatcher.TryEnqueue(() =>
             {
-                 OnPropertyChanged(nameof(IsRunningRegression));
-                 OnPropertyChanged(nameof(RunRegressionButtonText));
-                 RunRegressionCommand.NotifyCanExecuteChanged();
-                 StopRegressionCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(IsRunningRegression));
+                OnPropertyChanged(nameof(RunRegressionButtonText));
+                RunRegressionCommand.NotifyCanExecuteChanged();
+                StopRegressionCommand.NotifyCanExecuteChanged();
             });
 
-            // Initialize Bot VM
-            var botManager = new BotManager(); 
-            Bot = new BotViewModel(botManager, Config, ServerIp, ServerPort, ConvId);
+            var runtimeConfig = RuntimeConfig.LoadFromDisk();
+            ServerIp = runtimeConfig.ServerIp;
+            ServerPort = runtimeConfig.ServerPort;
+            ConvId = runtimeConfig.ConvId;
+            Config.NoDelay = runtimeConfig.Kcp.NoDelay;
+            Config.Interval = runtimeConfig.Kcp.Interval;
+            Config.Resend = runtimeConfig.Kcp.Resend;
+            Config.Nc = runtimeConfig.Kcp.Nc;
+            Config.SndWnd = runtimeConfig.Kcp.SndWnd;
+            Config.RcvWnd = runtimeConfig.Kcp.RcvWnd;
+
+            Bot = new BotViewModel(
+                botManager,
+                Config,
+                () => (ServerIp, ServerPort, ConvId));
+
+            RefreshLogsView();
         }
 
         private void Log(LogLevel level, string message)
         {
             _dispatcher.TryEnqueue(() =>
             {
-                // Optimization: Use Add (O(1)) instead of Insert(0) (O(N)).
-                // LogsView handles sorting (Time Descending).
                 _allLogs.Add(new LogEntry(DateTime.Now, message, level));
-                
                 if (_allLogs.Count > 1000)
                 {
-                    // Remove oldest (which was added first, so index 0)
                     _allLogs.RemoveAt(0);
                 }
+                RefreshLogsView();
             });
         }
-        
-        // Helper for internal logging without level (default to Info or Error based on simple check if needed, but better to be explicit)
+
         private void Log(string message)
         {
-             Log(LogLevel.Info, message);
+            Log(LogLevel.Info, message);
+        }
+
+        private void RefreshLogsView()
+        {
+            var query = _allLogs.AsEnumerable();
+            if (ShowErrorsOnly)
+            {
+                query = query.Where(log => log.Level == LogLevel.Error);
+            }
+            if (!string.IsNullOrWhiteSpace(FilterKeyword))
+            {
+                query = query.Where(log => log.Message.Contains(FilterKeyword, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var ordered = query.OrderByDescending(log => log.Time).ToList();
+            LogsView.Clear();
+            foreach (var log in ordered)
+            {
+                LogsView.Add(log);
+            }
         }
 
         [RelayCommand]
@@ -232,7 +233,9 @@ namespace KcpProbe.ViewModels
         // Regression
         public bool IsRunningRegression => _regressionService.IsRunningRegression;
         public string RunRegressionButtonText => IsRunningRegression ? "Running..." : "Run All Tests";
-        [ObservableProperty] private bool _skipServerForRegression = true;
+
+        [ObservableProperty]
+        private bool _skipServerForRegression = true;
 
         [RelayCommand(CanExecute = nameof(CanRunRegression))]
         private async Task RunRegression()

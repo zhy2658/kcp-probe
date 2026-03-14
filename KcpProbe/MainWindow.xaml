@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:KcpProbe"
+    xmlns:controls="using:KcpProbe.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -151,7 +152,7 @@
 
                     <!-- Splitter -->
                     <local:ResizeHandleBorder Grid.Column="1" Width="5" Cursor="SizeWestEast" Background="#404040" Margin="0,0,10,0"
-                        PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerCaptureLost="Splitter_PointerCaptureLost"/>
+                                              Mode="Columns" PrimaryIndex="0" SecondaryIndex="2" MinPrimary="300" MinSecondary="300"/>
 
                     <!-- Right: Stress Test & Bots & Monitor -->
                     <StackPanel Grid.Column="2" Spacing="10" Margin="0,0,0,0" Padding="10,0,0,0">
@@ -166,14 +167,7 @@
                         </StackPanel>
                         
                         <TextBlock Text="RTT Monitor (ms)" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,10,0,0"/>
-                        <Border BorderBrush="#303030" BorderThickness="1" Height="100" Background="#101010">
-                            <Grid>
-                                <Canvas x:Name="RttCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SizeChanged="RttCanvas_SizeChanged"/>
-                                <TextBlock x:Name="CurrentRttText" Text="-- ms" Foreground="LightGreen" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="5" FontSize="12"/>
-                                <TextBlock Text="0 ms" Foreground="Gray" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
-                                <TextBlock Text="100+ ms" Foreground="Gray" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
-                            </Grid>
-                        </Border>
+                        <controls:RttChartView x:Name="RttChart"/>
 
                         <Border Margin="0,10,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
                             <StackPanel Spacing="10">
@@ -196,10 +190,11 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             Background="#404040"
-            PointerPressed="LogResizeHandle_PointerPressed"
-            PointerMoved="LogResizeHandle_PointerMoved"
-            PointerReleased="LogResizeHandle_PointerReleased"
-            PointerCaptureLost="LogResizeHandle_PointerCaptureLost"/>
+            Mode="Rows"
+            PrimaryIndex="2"
+            SecondaryIndex="4"
+            MinPrimary="100"
+            MinSecondary="80"/>
 
         <!-- Footer: Logs -->
         <Grid Grid.Row="4" Background="Black">

@@ -1,0 +1,16 @@
+<UserControl
+    x:Class="KcpProbe.Controls.RttChartView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <Border BorderBrush="#303030" BorderThickness="1" Height="100" Background="#101010">
+        <Grid>
+            <Canvas x:Name="ChartCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SizeChanged="ChartCanvas_SizeChanged"/>
+            <TextBlock x:Name="CurrentRttText" Text="-- ms" Foreground="LightGreen" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="5" FontSize="12"/>
+            <TextBlock Text="0 ms" Foreground="Gray" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
+            <TextBlock Text="100+ ms" Foreground="Gray" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
+        </Grid>
+    </Border>
+</UserControl>
