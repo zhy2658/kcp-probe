@@ -13,9 +13,9 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="36"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition x:Name="MainContentRow" Height="*" MinHeight="220"/>
+            <RowDefinition x:Name="MainContentRow" Height="*" MinHeight="100"/>
             <RowDefinition Height="6"/>
-            <RowDefinition x:Name="LogPanelRow" Height="220" MinHeight="120"/>
+            <RowDefinition x:Name="LogPanelRow" Height="220" MinHeight="80"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -36,11 +36,25 @@
         </Grid>
 
         <!-- Header: Connection Config -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Padding="10" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
-            <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
-            <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
-            <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
-            <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
+        <StackPanel Grid.Row="1" Orientation="Vertical" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="10" Padding="10">
+                <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
+                <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
+                <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
+                <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
+                <TextBlock Text="{Binding StatsInfo}" VerticalAlignment="Bottom" Margin="20,0,0,5" Foreground="LightGreen" FontWeight="Bold"/>
+            </StackPanel>
+            
+            <Expander Header="Advanced KCP Settings" HorizontalAlignment="Stretch" IsExpanded="False" Margin="10,0,10,10">
+                <StackPanel Orientation="Horizontal" Spacing="20" Padding="10">
+                    <CheckBox Content="NoDelay" IsChecked="{Binding NoDelay, Mode=TwoWay}"/>
+                    <NumberBox Header="Interval (ms)" Value="{Binding Interval, Mode=TwoWay}" Width="100"/>
+                    <NumberBox Header="Resend" Value="{Binding Resend, Mode=TwoWay}" Width="80"/>
+                    <CheckBox Content="NC (Flow Control)" IsChecked="{Binding Nc, Mode=TwoWay}"/>
+                    <NumberBox Header="SndWnd" Value="{Binding SndWnd, Mode=TwoWay}" Width="80"/>
+                    <NumberBox Header="RcvWnd" Value="{Binding RcvWnd, Mode=TwoWay}" Width="80"/>
+                </StackPanel>
+            </Expander>
         </StackPanel>
 
         <!-- Content: Tabs -->
@@ -74,12 +88,29 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- Right: Stress Test -->
+                    <!-- Right: Stress Test & Bots & Monitor -->
                     <StackPanel Grid.Column="1" Spacing="10" Margin="10,0,0,0" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10,0,0,0">
                         <TextBlock Text="Stress Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
                         <TextBlock Text="Simple Stress Test (100 QPS)"/>
                         <Button Content="Start/Stop Stress" Click="Stress_Click"/>
-                        <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
+
+                        <TextBlock Text="Bot Swarm" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,10,0,0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                             <NumberBox Header="Count" Value="{Binding BotCount, Mode=TwoWay}" Width="100"/>
+                             <Button Content="{Binding BotButtonText}" Click="Bot_Click" VerticalAlignment="Bottom"/>
+                        </StackPanel>
+                        
+                        <TextBlock Text="RTT Monitor (ms)" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,10,0,0"/>
+                        <Border BorderBrush="#303030" BorderThickness="1" Height="100" Background="#101010">
+                            <Grid>
+                                <Canvas x:Name="RttCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SizeChanged="RttCanvas_SizeChanged"/>
+                                <TextBlock x:Name="CurrentRttText" Text="-- ms" Foreground="LightGreen" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="5" FontSize="12"/>
+                                <TextBlock Text="0 ms" Foreground="Gray" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
+                                <TextBlock Text="100+ ms" Foreground="Gray" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2,0,0,0" FontSize="10"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Margin="0,10,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
                             <StackPanel Spacing="10">
                                 <TextBlock Text="Test Management" Style="{StaticResource SubtitleTextBlockStyle}"/>
                                 <CheckBox Content="Skip server startup" IsChecked="{Binding SkipServerForRegression, Mode=TwoWay}"/>

@@ -3,12 +3,15 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
 using Windows.ApplicationModel.DataTransfer;
 using KcpProbe.ViewModels;
 using System.IO;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace KcpProbe
 {
@@ -22,6 +25,10 @@ namespace KcpProbe
         private double _contentStartHeight;
         private double _logStartHeight;
 
+        private Polyline _rttLine;
+        private List<double> _rttHistory = new List<double>();
+        private const int MaxHistory = 100;
+
         public MainWindow()
         {
             this.InitializeComponent();
@@ -31,8 +38,8 @@ namespace KcpProbe
             _appWindow = AppWindow.GetFromWindowId(windowId);
             if (_appWindow != null)
             {
-                _appWindow.Resize(new SizeInt32(1148, 868));
-                var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+                _appWindow.Resize(new SizeInt32(1256, 999));
+                var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
                 if (File.Exists(iconPath))
                 {
                     _appWindow.SetIcon(iconPath);
@@ -44,6 +51,61 @@ namespace KcpProbe
                 UpdateTitleBarInsets();
                 _presenter = _appWindow.Presenter as OverlappedPresenter;
             }
+
+            // Init Chart
+            _rttLine = new Polyline
+            {
+                Stroke = new SolidColorBrush(Colors.LightGreen),
+                StrokeThickness = 2
+            };
+            RttCanvas.Children.Add(_rttLine);
+            
+            ViewModel.RttUpdated += OnRttUpdated;
+        }
+
+        private void OnRttUpdated(double rtt)
+        {
+            _rttHistory.Add(rtt);
+            if (_rttHistory.Count > MaxHistory) _rttHistory.RemoveAt(0);
+            
+            CurrentRttText.Text = $"{rtt:F0} ms";
+            UpdateChart();
+        }
+
+        private void RttCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateChart();
+        }
+
+        private void UpdateChart()
+        {
+            if (RttCanvas.ActualWidth == 0 || RttCanvas.ActualHeight == 0) return;
+            
+            var width = RttCanvas.ActualWidth;
+            var height = RttCanvas.ActualHeight;
+            var step = width / MaxHistory;
+            
+            var points = new PointCollection();
+            double maxRtt = 100; // default min scale
+            foreach (var val in _rttHistory) if (val > maxRtt) maxRtt = val;
+            
+            for (int i = 0; i < _rttHistory.Count; i++)
+            {
+                var x = i * step;
+                var y = height - (_rttHistory[i] / maxRtt * height);
+                // Clamp y
+                if (y < 0) y = 0;
+                if (y > height) y = height;
+                
+                points.Add(new Windows.Foundation.Point(x, y));
+            }
+            
+            _rttLine.Points = points;
+        }
+
+        private void Bot_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.ToggleBots();
         }
 
         private void UpdateTitleBarInsets()
@@ -119,23 +181,22 @@ namespace KcpProbe
             var minContentHeight = MainContentRow.MinHeight;
             var minLogHeight = LogPanelRow.MinHeight;
 
-            var newContentHeight = _contentStartHeight + delta;
+            var totalHeight = _contentStartHeight + _logStartHeight;
             var newLogHeight = _logStartHeight - delta;
-
-            if (newContentHeight < minContentHeight)
-            {
-                newContentHeight = minContentHeight;
-                newLogHeight = _contentStartHeight + _logStartHeight - newContentHeight;
-            }
-
+            
+            // Limit log height based on min heights
             if (newLogHeight < minLogHeight)
             {
                 newLogHeight = minLogHeight;
-                newContentHeight = _contentStartHeight + _logStartHeight - newLogHeight;
+            }
+            
+            if ((totalHeight - newLogHeight) < minContentHeight)
+            {
+                newLogHeight = totalHeight - minContentHeight;
             }
 
-            MainContentRow.Height = new GridLength(newContentHeight, GridUnitType.Pixel);
             LogPanelRow.Height = new GridLength(newLogHeight, GridUnitType.Pixel);
+            // Don't set MainContentRow height, let it be '*' to fill remaining space
         }
 
         private void LogResizeHandle_PointerReleased(object sender, PointerRoutedEventArgs e)

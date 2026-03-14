@@ -9,6 +9,7 @@ using System.Windows.Input;
 using Kcp.Core;
 using KcpServer;
 using Microsoft.UI.Dispatching;
+using System.Linq;
 
 namespace KcpProbe.ViewModels
 {
@@ -39,6 +40,58 @@ namespace KcpProbe.ViewModels
             get => _convId;
             set { _convId = value; OnPropertyChanged(nameof(ConvId)); }
         }
+
+        #region KCP Config
+        private bool _noDelay = true;
+        public bool NoDelay { get => _noDelay; set { _noDelay = value; OnPropertyChanged(nameof(NoDelay)); } }
+
+        private int _interval = 10;
+        public int Interval { get => _interval; set { _interval = value; OnPropertyChanged(nameof(Interval)); } }
+
+        private int _resend = 2;
+        public int Resend { get => _resend; set { _resend = value; OnPropertyChanged(nameof(Resend)); } }
+
+        private bool _nc = true;
+        public bool Nc { get => _nc; set { _nc = value; OnPropertyChanged(nameof(Nc)); } }
+
+        private int _sndWnd = 128;
+        public int SndWnd { get => _sndWnd; set { _sndWnd = value; OnPropertyChanged(nameof(SndWnd)); } }
+
+        private int _rcvWnd = 128;
+        public int RcvWnd { get => _rcvWnd; set { _rcvWnd = value; OnPropertyChanged(nameof(RcvWnd)); } }
+        
+        private string _statsInfo = "WaitSnd: 0 | Unacked: 0 | RTO: 0";
+        public string StatsInfo { get => _statsInfo; set { _statsInfo = value; OnPropertyChanged(nameof(StatsInfo)); } }
+        #endregion
+
+        // Bots
+        private BotManager _botManager = new BotManager();
+        private int _botCount = 10;
+        public int BotCount { get => _botCount; set { _botCount = value; OnPropertyChanged(nameof(BotCount)); } }
+        public bool IsRunningBots => _botManager.IsRunning;
+        public string BotButtonText => IsRunningBots ? "Stop Bots" : "Start Bots";
+
+        public async void ToggleBots()
+        {
+            if (_botManager.IsRunning)
+            {
+                _botManager.StopBots();
+            }
+            else
+            {
+                var config = new KcpConfig 
+                {
+                     NoDelay = NoDelay, Interval = Interval, Resend = Resend, Nc = Nc, SndWnd = SndWnd, RcvWnd = RcvWnd
+                };
+                // Start bots with offset ConvId to avoid collision with main client
+                await _botManager.StartBots(BotCount, ServerIp, ServerPort, ConvId + 100, config);
+            }
+            OnPropertyChanged(nameof(IsRunningBots));
+            OnPropertyChanged(nameof(BotButtonText));
+        }
+
+        // Visualization
+        public event Action<double>? RttUpdated;
 
         private bool _isConnected;
         public bool IsConnected
@@ -79,7 +132,29 @@ namespace KcpProbe.ViewModels
         private void OnPong(BaseMessage msg)
         {
             var pong = PacketDispatcher.Instance.ParsePayload<Pong>(msg);
-            // ... (rest of the method)
+            
+            // Handle both standard Probe:{ts} and server echoed Pong: Probe:{ts}
+            string content = pong.Content;
+            int probeIndex = content.IndexOf("Probe:");
+            
+            if (probeIndex >= 0)
+            {
+                string tsStr = content.Substring(probeIndex + 6);
+                // Extract digits only in case there are suffixes
+                var digits = new string(tsStr.TakeWhile(char.IsDigit).ToArray());
+                
+                if (long.TryParse(digits, out long sendTime))
+                {
+                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var rtt = now - sendTime;
+                    // Filter unrealistic RTTs (e.g. clock sync issues)
+                    if (rtt >= 0 && rtt < 10000) 
+                    {
+                        _dispatcher.TryEnqueue(() => RttUpdated?.Invoke(rtt));
+                    }
+                }
+            }
+
             Log($"Recv Pong: {pong.Content}, ServerTime: {pong.RecvTime}");
         }
 
@@ -139,12 +214,48 @@ namespace KcpProbe.ViewModels
             {
                 try
                 {
-                    await _client.ConnectAsync(ServerIp, ServerPort, ConvId);
+                    var config = new KcpConfig 
+                    {
+                        NoDelay = NoDelay,
+                        Interval = Interval,
+                        Resend = Resend,
+                        Nc = Nc,
+                        SndWnd = SndWnd,
+                        RcvWnd = RcvWnd
+                    };
+                    await _client.ConnectAsync(ServerIp, ServerPort, ConvId, config);
+                    StartStatsPolling();
                 }
                 catch (Exception ex)
                 {
                     Log($"Connect Error: {ex.Message}");
                 }
+            }
+        }
+        
+        private async void StartStatsPolling()
+        {
+            while (IsConnected)
+            {
+                var stats = _client.GetStats();
+                if (stats != null)
+                {
+                    _dispatcher.TryEnqueue(() => 
+                    {
+                        StatsInfo = $"WaitSnd: {stats.WaitSnd} | Unacked: {stats.Unacked} | RTO: {stats.Rto}";
+                    });
+                }
+                
+                // Probe RTT
+                try 
+                {
+                    var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var ping = new Ping { Content = $"Probe:{now}", SendTime = (ulong)now };
+                    await _client.SendAsync(1, ping);
+                }
+                catch {}
+                
+                await Task.Delay(500);
             }
         }
 

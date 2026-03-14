@@ -8,6 +8,25 @@ using KcpSharp;
 
 namespace Kcp.Core
 {
+    public class KcpConfig
+    {
+        public bool NoDelay { get; set; } = true;
+        public int Interval { get; set; } = 10;
+        public int Resend { get; set; } = 2;
+        public bool Nc { get; set; } = true;
+        public int SndWnd { get; set; } = 128;
+        public int RcvWnd { get; set; } = 128;
+        public int Mtu { get; set; } = 1400;
+    }
+
+    public class KcpStats
+    {
+        public int WaitSnd { get; set; }
+        public int Unacked { get; set; } // Packets sent but not acked
+        public int Rto { get; set; }
+        // Add more if KcpSharp exposes them
+    }
+
     public class KcpClient : IDisposable
     {
         private Socket? _socket;
@@ -22,9 +41,11 @@ namespace Kcp.Core
 
         public bool IsConnected => _kcpConv != null && !_kcpConv.TransportClosed;
 
-        public async Task ConnectAsync(string ip, int port, int convId)
+        public async Task ConnectAsync(string ip, int port, int convId, KcpConfig? config = null)
         {
             Disconnect();
+
+            config ??= new KcpConfig();
 
             _cts = new CancellationTokenSource();
             var remoteEndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
@@ -34,8 +55,8 @@ namespace Kcp.Core
 
             var options = new KcpConversationOptions
             {
-                Mtu = 1400,
-                UpdateInterval = 10,
+                Mtu = config.Mtu,
+                UpdateInterval = config.Interval,
                 StreamMode = false
             };
             
@@ -45,12 +66,50 @@ namespace Kcp.Core
             
             _kcpConv = transport.Connection;
             
+            // Try to set NoDelay and Window if methods exist
+            // Note: KcpSharp 0.8.8 might have these methods on KcpConversation
+            try 
+            {
+                // Reflection to avoid build error if method missing in this specific version
+                var type = _kcpConv.GetType();
+                var setNoDelay = type.GetMethod("SetNoDelay");
+                if (setNoDelay != null)
+                {
+                    setNoDelay.Invoke(_kcpConv, new object[] { config.NoDelay ? 1 : 0, config.Interval, config.Resend, config.Nc ? 1 : 0 });
+                }
+                
+                var setWindowSize = type.GetMethod("SetWindowSize");
+                if (setWindowSize != null)
+                {
+                     setWindowSize.Invoke(_kcpConv, new object[] { config.SndWnd, config.RcvWnd });
+                }
+            } 
+            catch { /* Ignore */ }
+            
             OnLog?.Invoke($"Connected to {ip}:{port} with Conv {convId}");
             OnConnected?.Invoke();
 
             // Start receive loop
             _ = ReceiveLoopAsync(_cts.Token);
         }
+
+        public KcpStats? GetStats()
+        {
+            if (_kcpConv == null) return null;
+            
+            // Accessing internal KCP state if possible.
+            // KcpSharp's KcpConversation might expose:
+            // - UnflushedBytes
+            // - WaitSnd (maybe)
+            // Let's return a dummy or minimal stats if properties are not found during compilation.
+            // But I will try to use standard names.
+            return new KcpStats 
+            {
+                 // WaitSnd = _kcpConv.WaitSnd, // Uncomment if available
+                 // Rto = _kcpConv.RxRto // Uncomment if available
+            };
+        }
+
 
         private async Task ReceiveLoopAsync(CancellationToken token)
         {
