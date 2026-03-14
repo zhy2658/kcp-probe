@@ -22,6 +22,7 @@
         <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftPaddingColumn" Width="0"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
@@ -29,10 +30,47 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8" Margin="12,0,0,0">
                 <Image Source="Assets/app.png" Width="16" Height="16"/>
                 <TextBlock Text="KCP Tester" VerticalAlignment="Center"/>
+                <TextBlock Text="v1.0.1" Foreground="Gray" FontSize="10" VerticalAlignment="Bottom" Margin="0,0,0,2"/>
+                <!-- Network Badge -->
+                <Ellipse Width="8" Height="8" Fill="{Binding Status.StatusColor}" ToolTipService.ToolTip="{Binding Status.ConnectionStatus}" VerticalAlignment="Center" Margin="5,0,0,0"/>
             </StackPanel>
-            <ToggleButton x:Name="PinTopButton" Grid.Column="2" Click="PinTopButton_Click" VerticalAlignment="Stretch" Margin="0,0,8,0" Width="30" BorderThickness="0" Background="Transparent">
-                <SymbolIcon x:Name="PinTopIcon" Symbol="Pin" Margin="0,-3,0,0"/>
-            </ToggleButton>
+            
+            <!-- Middle: Environment & Profile -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <ComboBox PlaceholderText="Environment" SelectedIndex="0" Width="120" Height="28" Padding="8,4,0,0" FontSize="12">
+                     <ComboBoxItem Content="Localhost"/>
+                     <ComboBoxItem Content="Dev"/>
+                     <ComboBoxItem Content="Staging"/>
+                </ComboBox>
+                
+                <ComboBox PlaceholderText="Profile" SelectedIndex="0" Width="140" Height="28" Padding="8,4,0,0" FontSize="12">
+                     <ComboBoxItem Content="Default"/>
+                     <ComboBoxItem Content="Low Latency"/>
+                     <ComboBoxItem Content="High Loss"/>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Right: Actions -->
+            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="5" Margin="0,0,8,0">
+                 <!-- Theme Toggle -->
+                 <Button x:Name="ThemeButton" Click="ThemeButton_Click" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Toggle Theme">
+                     <SymbolIcon x:Name="ThemeIcon"/>
+                 </Button>
+                 
+                 <!-- Settings -->
+                 <Button Click="SettingsButton_Click" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Settings">
+                     <SymbolIcon Symbol="Setting"/>
+                 </Button>
+
+                 <!-- Help -->
+                 <Button Click="HelpButton_Click" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Help">
+                     <SymbolIcon Symbol="Help"/>
+                 </Button>
+
+                 <ToggleButton x:Name="PinTopButton" Click="PinTopButton_Click" VerticalAlignment="Stretch" Width="30" BorderThickness="0" Background="Transparent" ToolTipService.ToolTip="Always on Top">
+                    <SymbolIcon x:Name="PinTopIcon" Symbol="Pin" Margin="0,-3,0,0"/>
+                </ToggleButton>
+            </StackPanel>
         </Grid>
 
         <!-- Header: Connection Config -->
@@ -63,9 +101,6 @@
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="Health:" Foreground="Gray"/>
                         <TextBlock Text="{Binding Status.HealthStatus}" Foreground="{Binding Status.HealthColor}" FontWeight="Bold"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="5">
-                         <TextBlock Text="v1.0.1" Foreground="Gray" FontSize="11" VerticalAlignment="Bottom"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>

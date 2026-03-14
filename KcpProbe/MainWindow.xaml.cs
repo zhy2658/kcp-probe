@@ -63,6 +63,13 @@ namespace KcpProbe
             RttCanvas.Children.Add(_rttLine);
             
             ViewModel.RttUpdated += OnRttUpdated;
+            
+            // Set initial theme icon
+            if (Content is FrameworkElement root)
+            {
+                // Use Target for Light, Favorite for Dark
+                ThemeIcon.Symbol = root.RequestedTheme == ElementTheme.Dark ? Symbol.Target : Symbol.Favorite;
+            }
         }
 
         private void OnRttUpdated(double rtt)
@@ -227,6 +234,55 @@ namespace KcpProbe
         private void LogResizeHandle_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
         {
             _isDraggingLogPanel = false;
+        }
+
+        private void ThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+             if (Content is FrameworkElement rootElement)
+             {
+                 if (rootElement.RequestedTheme == ElementTheme.Default)
+                 {
+                      rootElement.RequestedTheme = ElementTheme.Light;
+                 }
+                 else
+                 {
+                      rootElement.RequestedTheme = rootElement.RequestedTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+                 }
+                 
+                 // Update icon
+                 if (ThemeButton.Content is SymbolIcon icon)
+                 {
+                     icon.Symbol = rootElement.RequestedTheme == ElementTheme.Dark ? Symbol.Target : Symbol.Favorite;
+                 }
+                 else if (ThemeIcon != null)
+                 {
+                     ThemeIcon.Symbol = rootElement.RequestedTheme == ElementTheme.Dark ? Symbol.Target : Symbol.Favorite;
+                 }
+             }
+        }
+
+        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+             var dialog = new ContentDialog
+             {
+                 Title = "Settings",
+                 Content = new TextBlock { Text = "Settings panel placeholder.\nHere you can configure global preferences." },
+                 CloseButtonText = "Close",
+                 XamlRoot = this.Content.XamlRoot
+             };
+             await dialog.ShowAsync();
+        }
+
+        private async void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+             var dialog = new ContentDialog
+             {
+                 Title = "Help",
+                 Content = new TextBlock { Text = "KCP Tester v1.0.1\n\n1. Configure IP/Port/Conv ID.\n2. Click Connect.\n3. Use Interface Test for single packets.\n4. Use Stress Test for load testing.\n5. Use Bot Swarm for multi-client simulation." },
+                 CloseButtonText = "Got it",
+                 XamlRoot = this.Content.XamlRoot
+             };
+             await dialog.ShowAsync();
         }
 
         private void CopySelectedLogs_Click(object sender, RoutedEventArgs e)

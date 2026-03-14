@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Kcp.Core;
+using Microsoft.UI;
+using Microsoft.UI.Xaml.Media;
 
 namespace KcpProbe.ViewModels
 {
@@ -44,20 +46,20 @@ namespace KcpProbe.ViewModels
             OnPropertyChanged(nameof(HealthColor));
         }
 
-        public string StatusColor => ConnectionStatus switch
+        public Brush StatusColor => new SolidColorBrush(ConnectionStatus switch
         {
-            KcpConstants.ConnectionStatus.Connected => "LightGreen",
-            KcpConstants.ConnectionStatus.Connecting => "Yellow",
-            _ => "Red"
-        };
+            KcpConstants.ConnectionStatus.Connected => Colors.LightGreen,
+            KcpConstants.ConnectionStatus.Connecting => Colors.Yellow,
+            _ => Colors.Red
+        });
 
-        public string HealthColor => HealthStatus switch
+        public Brush HealthColor => new SolidColorBrush(HealthStatus switch
         {
-            KcpConstants.HealthStatus.Good => "LightGreen",
-            KcpConstants.HealthStatus.Fair => "Yellow",
-            KcpConstants.HealthStatus.Poor => "Orange",
-            KcpConstants.HealthStatus.Critical => "Red",
-            _ => "Gray"
-        };
+            KcpConstants.HealthStatus.Good => Colors.LightGreen,
+            KcpConstants.HealthStatus.Fair => Colors.Yellow,
+            KcpConstants.HealthStatus.Poor => Colors.Orange,
+            KcpConstants.HealthStatus.Critical => Colors.Red,
+            _ => Colors.Gray
+        });
     }
 }
