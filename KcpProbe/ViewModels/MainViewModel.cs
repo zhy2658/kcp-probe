@@ -68,6 +68,7 @@ namespace KcpProbe.ViewModels
 
             // Initialize Logs View
             LogsView = new AdvancedCollectionView(_allLogs, true);
+            LogsView.SortDescriptions.Add(new SortDescription("Time", SortDirection.Descending));
             LogsView.Filter = item =>
             {
                 if (item is not LogEntry log) return false;
@@ -112,30 +113,26 @@ namespace KcpProbe.ViewModels
             Bot = new BotViewModel(botManager, Config, ServerIp, ServerPort, ConvId);
         }
 
-        private void Log(string message)
+        private void Log(LogLevel level, string message)
         {
             _dispatcher.TryEnqueue(() =>
             {
-                var level = LogLevel.Info;
-                if (message.Contains("Error", StringComparison.OrdinalIgnoreCase) || 
-                    message.Contains("Fail", StringComparison.OrdinalIgnoreCase) ||
-                    message.Contains("[REG-ERR]", StringComparison.OrdinalIgnoreCase))
+                // Optimization: Use Add (O(1)) instead of Insert(0) (O(N)).
+                // LogsView handles sorting (Time Descending).
+                _allLogs.Add(new LogEntry(DateTime.Now, message, level));
+                
+                if (_allLogs.Count > 1000)
                 {
-                    level = LogLevel.Error;
+                    // Remove oldest (which was added first, so index 0)
+                    _allLogs.RemoveAt(0);
                 }
-                else if (message.Contains("Warning", StringComparison.OrdinalIgnoreCase))
-                {
-                    level = LogLevel.Warning;
-                }
-                else if (message.Contains("PASS", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("Connected", StringComparison.OrdinalIgnoreCase))
-                {
-                    level = LogLevel.Success;
-                }
-
-                _allLogs.Insert(0, new LogEntry(DateTime.Now, message, level));
-                if (_allLogs.Count > 1000) _allLogs.RemoveAt(_allLogs.Count - 1);
             });
+        }
+        
+        // Helper for internal logging without level (default to Info or Error based on simple check if needed, but better to be explicit)
+        private void Log(string message)
+        {
+             Log(LogLevel.Info, message);
         }
 
         [RelayCommand]
@@ -163,7 +160,7 @@ namespace KcpProbe.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Log($"Connect Error: {ex.Message}");
+                    Log(LogLevel.Error, $"Connect Error: {ex.Message}");
                     Status.SetConnected(false);
                 }
             }
@@ -174,7 +171,7 @@ namespace KcpProbe.ViewModels
         {
             if (!Status.IsConnected)
             {
-                Log("Not connected");
+                Log(LogLevel.Warning, "Not connected");
                 return;
             }
 
@@ -186,11 +183,11 @@ namespace KcpProbe.ViewModels
                     SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                 };
                 await _kcpClient.SendAsync(KcpConstants.MessageIds.Ping, ping);
-                Log($"Sent Ping: {PingContent}");
+                Log(LogLevel.Info, $"Sent Ping: {PingContent}");
             }
             catch (Exception ex)
             {
-                Log($"Send Error: {ex.Message}");
+                Log(LogLevel.Error, $"Send Error: {ex.Message}");
             }
         }
 
@@ -199,7 +196,7 @@ namespace KcpProbe.ViewModels
         {
             if (!Status.IsConnected)
             {
-                Log("Not connected");
+                Log(LogLevel.Warning, "Not connected");
                 return;
             }
 
@@ -211,11 +208,11 @@ namespace KcpProbe.ViewModels
                     Params = ApiParams
                 };
                 await _kcpClient.SendAsync(KcpConstants.MessageIds.RpcRequest, req);
-                Log($"Sent RPC: {ApiMethod} {ApiParams}");
+                Log(LogLevel.Info, $"Sent RPC: {ApiMethod} {ApiParams}");
             }
             catch (Exception ex)
             {
-                Log($"Send RPC Error: {ex.Message}");
+                Log(LogLevel.Error, $"Send RPC Error: {ex.Message}");
             }
         }
 

@@ -16,14 +16,14 @@ internal sealed class SmokeTestContext : IDisposable
         Options = options;
         Client = new KcpClient();
         Client.OnMessageReceived += OnMessageReceived;
-        Client.OnLog += m => Console.WriteLine($"[KcpClient] {m}");
+        Client.OnLog += (level, m) => Console.WriteLine($"[KcpClient][{level}] {m}");
         _dispatcher.OnMessageDispatch += OnMessageDispatched;
     }
 
     public SmokeTestOptions Options { get; }
     public KcpClient Client { get; }
 
-    private void OnMessageReceived(byte[] data)
+    private void OnMessageReceived(ReadOnlyMemory<byte> data)
     {
         _dispatcher.Dispatch(data);
     }

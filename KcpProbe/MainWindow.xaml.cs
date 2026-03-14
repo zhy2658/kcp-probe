@@ -12,6 +12,8 @@ using System.IO;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using Windows.ApplicationModel;
+using System.Reflection;
 
 using KcpProbe.Models;
 
@@ -69,6 +71,25 @@ namespace KcpProbe
             {
                 // Use Target for Light, Favorite for Dark
                 ThemeIcon.Symbol = root.RequestedTheme == ElementTheme.Dark ? Symbol.Target : Symbol.Favorite;
+            }
+
+            // Set Version (Safe for Unpackaged)
+            AppVersionText.Text = $"v{GetAppVersion()}";
+        }
+        
+        private string GetAppVersion()
+        {
+            try 
+            {
+                // Try to get from Package first (if packaged)
+                var version = Package.Current.Id.Version;
+                return $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+            }
+            catch
+            {
+                // Fallback to Assembly version (for Unpackaged)
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                return version?.ToString() ?? "1.0.0";
             }
         }
 
@@ -266,7 +287,7 @@ namespace KcpProbe
              var dialog = new ContentDialog
              {
                  Title = "Settings",
-                 Content = new TextBlock { Text = "Settings panel placeholder.\nHere you can configure global preferences." },
+                 Content = new TextBlock { Text = "Global settings configuration will be available in future updates." },
                  CloseButtonText = "Close",
                  XamlRoot = this.Content.XamlRoot
              };
@@ -275,10 +296,11 @@ namespace KcpProbe
 
         private async void HelpButton_Click(object sender, RoutedEventArgs e)
         {
+             var versionStr = GetAppVersion();
              var dialog = new ContentDialog
              {
                  Title = "Help",
-                 Content = new TextBlock { Text = "KCP Tester v1.0.1\n\n1. Configure IP/Port/Conv ID.\n2. Click Connect.\n3. Use Interface Test for single packets.\n4. Use Stress Test for load testing.\n5. Use Bot Swarm for multi-client simulation." },
+                 Content = new TextBlock { Text = $"KCP Tester v{versionStr}\n\n1. Configure IP/Port/Conv ID.\n2. Click Connect.\n3. Use Interface Test for single packets.\n4. Use Stress Test for load testing.\n5. Use Bot Swarm for multi-client simulation." },
                  CloseButtonText = "Got it",
                  XamlRoot = this.Content.XamlRoot
              };

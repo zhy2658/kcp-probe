@@ -19,8 +19,7 @@
     <StartupObject>KcpProbe.Program</StartupObject>
     <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <DefaultItemExcludes>$(DefaultItemExcludes);Kcp.Core\**;Kcp.SmokeTests\**</DefaultItemExcludes>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

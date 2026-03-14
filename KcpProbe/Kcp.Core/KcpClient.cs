@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
@@ -15,8 +16,14 @@ namespace Kcp.Core
         private KcpConversation? _kcpConv;
         private CancellationTokenSource? _cts;
         
-        public event Action<byte[]>? OnMessageReceived;
-        public event Action<string>? OnLog;
+        // Reflection cache
+        private static FieldInfo? _f_snd_nxt;
+        private static FieldInfo? _f_snd_una;
+        private static FieldInfo? _f_rx_rto;
+        private static bool _reflectionInitialized;
+
+        public event Action<ReadOnlyMemory<byte>>? OnMessageReceived;
+        public event Action<LogLevel, string>? OnLog;
         public event Action? OnConnected;
         public event Action? OnDisconnected;
 
@@ -52,11 +59,33 @@ namespace Kcp.Core
             
             _kcpConv = transport.Connection;
             
-            OnLog?.Invoke($"Connected to {ip}:{port} with Conv {convId}");
+            // Initialize reflection cache once
+            if (!_reflectionInitialized)
+            {
+                InitializeReflection(_kcpConv.GetType());
+            }
+
+            OnLog?.Invoke(LogLevel.Success, $"Connected to {ip}:{port} with Conv {convId}");
             OnConnected?.Invoke();
 
             // Start receive loop
             _ = ReceiveLoopAsync(_cts.Token);
+        }
+
+        private static void InitializeReflection(Type type)
+        {
+            try
+            {
+                var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+                _f_snd_nxt = type.GetField("_snd_nxt", flags);
+                _f_snd_una = type.GetField("_snd_una", flags);
+                _f_rx_rto = type.GetField("_rx_rto", flags);
+                _reflectionInitialized = true;
+            }
+            catch
+            {
+                // Ignore reflection errors
+            }
         }
 
         public KcpStats? GetStats()
@@ -70,25 +99,24 @@ namespace Kcp.Core
 
             try 
             {
-                // WaitSnd and RTO are not exposed publicly in KcpSharp 0.8.8
-                // We have to use reflection to get them for monitoring purpose.
-                var type = _kcpConv.GetType();
-                var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-
-                var f_snd_nxt = type.GetField("_snd_nxt", flags);
-                var f_snd_una = type.GetField("_snd_una", flags);
-                if (f_snd_nxt != null && f_snd_una != null)
+                if (_f_snd_nxt != null && _f_snd_una != null)
                 {
-                    uint snd_nxt = (uint)f_snd_nxt.GetValue(_kcpConv);
-                    uint snd_una = (uint)f_snd_una.GetValue(_kcpConv);
+                    uint snd_nxt = (uint)_f_snd_nxt.GetValue(_kcpConv)!;
+                    uint snd_una = (uint)_f_snd_una.GetValue(_kcpConv)!;
                     stats.WaitSnd = (int)(snd_nxt - snd_una);
                 }
 
-                var f_rx_rto = type.GetField("_rx_rto", flags);
-                if (f_rx_rto != null) stats.Rto = Convert.ToInt32(f_rx_rto.GetValue(_kcpConv));
+                if (_f_rx_rto != null) 
+                {
+                    stats.Rto = Convert.ToInt32(_f_rx_rto.GetValue(_kcpConv));
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Log only in debug to avoid spam
+                #if DEBUG
+                System.Diagnostics.Debug.WriteLine($"Stats Error: {ex.Message}");
+                #endif
             }
             
             return stats;
@@ -110,9 +138,10 @@ namespace Kcp.Core
 
                     if (result.BytesReceived > 0)
                     {
-                        byte[] data = new byte[result.BytesReceived];
-                        Array.Copy(buffer, data, result.BytesReceived);
-                        OnMessageReceived?.Invoke(data);
+                        // Optimization: Use ReadOnlyMemory slice to avoid allocation.
+                        // Note: Subscribers must not hold onto this memory beyond the synchronous callback execution.
+                        var slice = new ReadOnlyMemory<byte>(buffer, 0, result.BytesReceived);
+                        OnMessageReceived?.Invoke(slice);
                     }
                 }
             }
@@ -120,7 +149,7 @@ namespace Kcp.Core
             {
                 if (!token.IsCancellationRequested)
                 {
-                    OnLog?.Invoke($"KCP Receive Error: {ex.Message}");
+                    OnLog?.Invoke(LogLevel.Error, $"KCP Receive Error: {ex.Message}");
                     Disconnect();
                 }
             }

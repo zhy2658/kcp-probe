@@ -1,15 +1,8 @@
 using System;
+using Kcp.Core;
 
 namespace KcpProbe.Models
 {
-    public enum LogLevel
-    {
-        Info,
-        Warning,
-        Error,
-        Success
-    }
-
     public record LogEntry(DateTime Time, string Message, LogLevel Level)
     {
         public string FormattedTime => Time.ToString("HH:mm:ss");

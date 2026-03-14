@@ -100,7 +100,7 @@ namespace KcpProbe.Services
             HealthStatusChanged?.Invoke(status);
         }
 
-        private void OnMessageReceived(byte[] data)
+        private void OnMessageReceived(ReadOnlyMemory<byte> data)
         {
             _dispatcher.Dispatch(data);
         }

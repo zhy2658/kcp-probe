@@ -15,7 +15,7 @@ namespace KcpProbe.Services
         private bool _regressionStopRequested;
 
         public event Action<bool>? IsRunningChanged;
-        public event Action<string>? Log;
+        public event Action<LogLevel, string>? Log;
 
         public bool IsRunningRegression
         {
@@ -37,7 +37,7 @@ namespace KcpProbe.Services
             var scriptPath = ResolveRegressionScriptPath();
             if (string.IsNullOrWhiteSpace(scriptPath))
             {
-                Log?.Invoke($"Regression script not found: {KcpConstants.Scripts.RegressionScript}");
+                Log?.Invoke(LogLevel.Error, $"Regression script not found: {KcpConstants.Scripts.RegressionScript}");
                 return;
             }
 
@@ -46,7 +46,7 @@ namespace KcpProbe.Services
 
             try
             {
-                Log?.Invoke("Starting regression...");
+                Log?.Invoke(LogLevel.Info, "Starting regression...");
                 var args = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -Ip {serverIp} -Port {serverPort} -Conv {convId}";
                 if (skipServer)
                 {
@@ -71,14 +71,20 @@ namespace KcpProbe.Services
                 {
                     if (!string.IsNullOrWhiteSpace(e.Data))
                     {
-                        Log?.Invoke($"[REG] {e.Data}");
+                        var level = LogLevel.Info;
+                        if (e.Data.Contains("FAIL") || e.Data.Contains("Error", StringComparison.OrdinalIgnoreCase))
+                            level = LogLevel.Error;
+                        else if (e.Data.Contains("PASS"))
+                            level = LogLevel.Success;
+                        
+                        Log?.Invoke(level, $"[REG] {e.Data}");
                     }
                 };
                 process.ErrorDataReceived += (_, e) =>
                 {
                     if (!string.IsNullOrWhiteSpace(e.Data))
                     {
-                        Log?.Invoke($"[REG-ERR] {e.Data}");
+                        Log?.Invoke(LogLevel.Error, $"[REG-ERR] {e.Data}");
                     }
                 };
 
@@ -94,26 +100,26 @@ namespace KcpProbe.Services
                 }
                 catch (OperationCanceledException)
                 {
-                    Log?.Invoke("Regression timed out (60s). Killing process...");
+                    Log?.Invoke(LogLevel.Error, "Regression timed out (60s). Killing process...");
                     process.Kill(true);
                 }
 
                 if (_regressionStopRequested)
                 {
-                    Log?.Invoke("Regression stopped by user");
+                    Log?.Invoke(LogLevel.Warning, "Regression stopped by user");
                 }
                 else if (process.ExitCode == 0)
                 {
-                    Log?.Invoke("Regression finished: PASS");
+                    Log?.Invoke(LogLevel.Success, "Regression finished: PASS");
                 }
                 else
                 {
-                    Log?.Invoke($"Regression finished: FAIL (ExitCode={process.ExitCode})");
+                    Log?.Invoke(LogLevel.Error, $"Regression finished: FAIL (ExitCode={process.ExitCode})");
                 }
             }
             catch (Exception ex)
             {
-                Log?.Invoke($"Regression Error: {ex.Message}");
+                Log?.Invoke(LogLevel.Error, $"Regression Error: {ex.Message}");
             }
             finally
             {
@@ -132,13 +138,13 @@ namespace KcpProbe.Services
                 if (!_regressionProcess.HasExited)
                 {
                     _regressionStopRequested = true;
-                    Log?.Invoke("Stopping regression...");
+                    Log?.Invoke(LogLevel.Warning, "Stopping regression...");
                     _regressionProcess.Kill(true);
                 }
             }
             catch (Exception ex)
             {
-                Log?.Invoke($"Stop regression error: {ex.Message}");
+                Log?.Invoke(LogLevel.Error, $"Stop regression error: {ex.Message}");
             }
         }
 

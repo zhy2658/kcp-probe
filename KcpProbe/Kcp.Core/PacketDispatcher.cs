@@ -7,52 +7,63 @@ namespace Kcp.Core
 {
     public class PacketDispatcher
     {
-        private readonly Dictionary<uint, Action<BaseMessage>> _handlers = new Dictionary<uint, Action<BaseMessage>>();
+        private readonly object _lock = new object();
+        private readonly Dictionary<uint, Action<BaseMessage>?> _handlers = new Dictionary<uint, Action<BaseMessage>?>();
         
         public event Action<BaseMessage>? OnMessageDispatch;
-
-        // Singleton is discouraged, prefer dependency injection
-        private static PacketDispatcher? _instance;
-        public static PacketDispatcher Instance => _instance ??= new PacketDispatcher();
+        public event Action<LogLevel, string>? OnLog;
 
         public void RegisterHandler(uint msgId, Action<BaseMessage> handler)
         {
-            if (_handlers.ContainsKey(msgId))
+            lock (_lock)
             {
-                _handlers[msgId] += handler;
-            }
-            else
-            {
-                _handlers[msgId] = handler;
+                if (_handlers.ContainsKey(msgId))
+                {
+                    _handlers[msgId] += handler;
+                }
+                else
+                {
+                    _handlers[msgId] = handler;
+                }
             }
         }
 
         public void UnregisterHandler(uint msgId, Action<BaseMessage> handler)
         {
-            if (_handlers.ContainsKey(msgId))
+            lock (_lock)
             {
-                _handlers[msgId] -= handler;
-                if (_handlers[msgId] == null)
+                if (_handlers.ContainsKey(msgId))
                 {
-                    _handlers.Remove(msgId);
+                    _handlers[msgId] -= handler;
+                    if (_handlers[msgId] == null)
+                    {
+                        _handlers.Remove(msgId);
+                    }
                 }
             }
         }
 
-        public void Dispatch(byte[] data)
+        public void Dispatch(ReadOnlyMemory<byte> data)
         {
             try
             {
-                var baseMsg = BaseMessage.Parser.ParseFrom(data);
+                var baseMsg = BaseMessage.Parser.ParseFrom(data.Span);
                 OnMessageDispatch?.Invoke(baseMsg);
-                if (_handlers.TryGetValue(baseMsg.MsgId, out var handler))
+                
+                Action<BaseMessage>? handler = null;
+                lock (_lock)
                 {
-                    handler?.Invoke(baseMsg);
+                    if (_handlers.TryGetValue(baseMsg.MsgId, out var h))
+                    {
+                        handler = h;
+                    }
                 }
+                
+                handler?.Invoke(baseMsg);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Dispatch Error: {ex.Message}");
+                OnLog?.Invoke(LogLevel.Error, $"Dispatch Error: {ex.Message}");
             }
         }
         

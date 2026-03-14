@@ -13,7 +13,7 @@ namespace KcpProbe.Services
         private bool _isStressing;
 
         public event Action<bool>? IsStressingChanged;
-        public event Action<string>? Log;
+        public event Action<LogLevel, string>? Log;
 
         public StressTestService(IKcpClient client)
         {
@@ -38,12 +38,12 @@ namespace KcpProbe.Services
             if (IsStressing) return;
             if (!_client.IsConnected)
             {
-                Log?.Invoke("Please connect first");
+                Log?.Invoke(LogLevel.Warning, "Please connect first");
                 return;
             }
 
             IsStressing = true;
-            Log?.Invoke("Starting Stress Test...");
+            Log?.Invoke(LogLevel.Info, "Starting Stress Test...");
             _stressCts = new CancellationTokenSource();
 
             try
@@ -56,7 +56,7 @@ namespace KcpProbe.Services
                     
                     if (count % 50 == 0) // Log every 50 packets (approx 0.5s)
                     {
-                        Log?.Invoke($"[Stress] Sent {count} pings...");
+                        Log?.Invoke(LogLevel.Info, $"[Stress] Sent {count} pings...");
                     }
                     
                     await Task.Delay(KcpConstants.Timeouts.StressIntervalMs, _stressCts.Token);
@@ -65,12 +65,12 @@ namespace KcpProbe.Services
             catch (TaskCanceledException) { }
             catch (Exception ex)
             {
-                Log?.Invoke($"Stress Test Error: {ex.Message}");
+                Log?.Invoke(LogLevel.Error, $"Stress Test Error: {ex.Message}");
             }
             finally
             {
                 IsStressing = false;
-                Log?.Invoke("Stress Test Stopped");
+                Log?.Invoke(LogLevel.Info, "Stress Test Stopped");
             }
         }
 

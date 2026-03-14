@@ -6,8 +6,8 @@ namespace Kcp.Core
 {
     public interface IKcpClient : IDisposable
     {
-        event Action<byte[]>? OnMessageReceived;
-        event Action<string>? OnLog;
+        event Action<ReadOnlyMemory<byte>>? OnMessageReceived;
+        event Action<LogLevel, string>? OnLog;
         event Action? OnConnected;
         event Action? OnDisconnected;
 
