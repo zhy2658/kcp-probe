@@ -11,13 +11,32 @@
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="36"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition x:Name="MainContentRow" Height="*" MinHeight="220"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition x:Name="LogPanelRow" Height="220" MinHeight="120"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftPaddingColumn" Width="0"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8" Margin="12,0,0,0">
+                <Image Source="Assets/app.png" Width="16" Height="16"/>
+                <TextBlock Text="KCP Tester" VerticalAlignment="Center"/>
+            </StackPanel>
+            <ToggleButton x:Name="PinTopButton" Grid.Column="2" Click="PinTopButton_Click" VerticalAlignment="Stretch" Margin="0,0,8,0" Width="30" BorderThickness="0" Background="Transparent">
+                <SymbolIcon x:Name="PinTopIcon" Symbol="Pin" Margin="0,-3,0,0"/>
+            </ToggleButton>
+        </Grid>
+
         <!-- Header: Connection Config -->
-        <StackPanel Orientation="Horizontal" Spacing="10" Padding="10" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Padding="10" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
             <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
             <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
             <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
@@ -25,39 +44,93 @@
         </StackPanel>
 
         <!-- Content: Tabs -->
-        <NavigationView Grid.Row="1" PaneDisplayMode="Top" IsSettingsVisible="False">
+        <NavigationView Grid.Row="2" PaneDisplayMode="Top" IsSettingsVisible="False">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Interface Test" Tag="Interface"/>
-                <NavigationViewItem Content="Stress Test" Tag="Stress"/>
+                <!-- <NavigationViewItem Content="Interface Test" Tag="Interface"/>
+                <NavigationViewItem Content="Stress Test" Tag="Stress"/> -->
             </NavigationView.MenuItems>
-            <Frame x:Name="ContentFrame"/>
-        </NavigationView>
-        
-        <!-- Simplified Content for now without navigation logic overhead -->
-        <Grid Grid.Row="1" Padding="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
             
-            <!-- Left: Interface Test -->
-            <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,10,0">
-                <TextBlock Text="Interface Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
-                <TextBox Header="Ping Content" Text="{Binding PingContent, Mode=TwoWay}"/>
-                <Button Content="Send Ping" Click="SendPing_Click"/>
-            </StackPanel>
+            <!-- Simplified Content for now without navigation logic overhead -->
+            <Grid Padding="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Left: Interface Test -->
+                    <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,10,0">
+                        <TextBlock Text="Interface Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                        <TextBox Header="Ping Content" Text="{Binding PingContent, Mode=TwoWay}"/>
+                        <Button Content="Send Ping" Click="SendPing_Click"/>
 
-            <!-- Right: Stress Test -->
-            <StackPanel Grid.Column="1" Spacing="10" Margin="10,0,0,0" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10,0,0,0">
-                <TextBlock Text="Stress Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
-                <TextBlock Text="Simple Stress Test (100 QPS)"/>
-                <Button Content="Start/Stop Stress" Click="Stress_Click"/>
-            </StackPanel>
-        </Grid>
+                        <!-- RPC Section -->
+                        <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="RPC Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                                <TextBox Header="Method" Text="{Binding ApiMethod, Mode=TwoWay}"/>
+                                <TextBox Header="Params (JSON)" Text="{Binding ApiParams, Mode=TwoWay}" Height="100" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <Button Content="Call API" Click="CallApi_Click"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Right: Stress Test -->
+                    <StackPanel Grid.Column="1" Spacing="10" Margin="10,0,0,0" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10,0,0,0">
+                        <TextBlock Text="Stress Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                        <TextBlock Text="Simple Stress Test (100 QPS)"/>
+                        <Button Content="Start/Stop Stress" Click="Stress_Click"/>
+                        <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Test Management" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                                <CheckBox Content="Skip server startup" IsChecked="{Binding SkipServerForRegression, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="{Binding RunRegressionButtonText}" Click="RunRegression_Click"/>
+                                    <Button Content="Stop" Click="StopRegression_Click" IsEnabled="{Binding IsRunningRegression}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+        </NavigationView>
+
+        <local:ResizeHandleBorder
+            x:Name="LogResizeHandle"
+            Grid.Row="3"
+            Height="6"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="#404040"
+            PointerPressed="LogResizeHandle_PointerPressed"
+            PointerMoved="LogResizeHandle_PointerMoved"
+            PointerReleased="LogResizeHandle_PointerReleased"
+            PointerCaptureLost="LogResizeHandle_PointerCaptureLost"/>
 
         <!-- Footer: Logs -->
-        <Grid Grid.Row="2" Height="200" Background="Black">
-            <ListView ItemsSource="{Binding Logs}" Foreground="LightGreen" FontFamily="Consolas"/>
+        <Grid Grid.Row="4" Background="Black">
+            <StackPanel Canvas.ZIndex="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Spacing="8" Margin="8,6,8,0">
+                <Button Content="Copy Selected" Click="CopySelectedLogs_Click"/>
+                <Button Content="Copy All" Click="CopyAllLogs_Click"/>
+                <Button Content="Clear" Click="ClearLogs_Click"/>
+            </StackPanel>
+            <ListView
+                x:Name="LogsListView"
+                ItemsSource="{Binding Logs}"
+                Foreground="LightGreen"
+                FontFamily="Consolas"
+                SelectionMode="Extended">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" Margin="0" Padding="0" LineHeight="16" IsTextSelectionEnabled="True"/>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
         </Grid>
     </Grid>
 </Window>

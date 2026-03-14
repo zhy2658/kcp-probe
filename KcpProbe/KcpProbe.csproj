@@ -5,6 +5,7 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>KcpProbe</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Platforms>x86;x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
@@ -17,10 +18,14 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <StartupObject>KcpProbe.Program</StartupObject>
     <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Kcp.Core\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Kcp.Core\**;Kcp.SmokeTests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Assets\app.png" />
+    <Content Include="Assets\app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />

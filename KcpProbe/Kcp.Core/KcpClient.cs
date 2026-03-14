@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -86,9 +85,6 @@ namespace Kcp.Core
 
         public async Task SendAsync(uint msgId, IMessage message)
         {
-            if (_kcpConv == null) return;
-
-            // Wrap in BaseMessage
             var baseMsg = new KcpServer.BaseMessage
             {
                 MsgId = msgId,
@@ -97,7 +93,14 @@ namespace Kcp.Core
                 Timestamp = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
 
-            byte[] data = baseMsg.ToByteArray();
+            await SendBaseMessageAsync(baseMsg);
+        }
+
+        public async Task SendBaseMessageAsync(KcpServer.BaseMessage baseMessage)
+        {
+            if (_kcpConv == null) return;
+
+            byte[] data = baseMessage.ToByteArray();
             await _kcpConv.SendAsync(data, CancellationToken.None);
         }
 

@@ -11,4 +11,5 @@
     <Deploy />
   </Project>
   <Project Path="KcpProbe/Kcp.Core/Kcp.Core.csproj" />
+  <Project Path="KcpProbe/Kcp.SmokeTests/Kcp.SmokeTests.csproj" />
 </Solution>
