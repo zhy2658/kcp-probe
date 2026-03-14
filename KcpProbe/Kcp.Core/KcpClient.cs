@@ -10,13 +10,13 @@ namespace Kcp.Core
 {
     public class KcpConfig
     {
-        public bool NoDelay { get; set; } = true;
-        public int Interval { get; set; } = 10;
-        public int Resend { get; set; } = 2;
-        public bool Nc { get; set; } = true;
-        public int SndWnd { get; set; } = 128;
-        public int RcvWnd { get; set; } = 128;
-        public int Mtu { get; set; } = 1400;
+        public bool NoDelay { get; set; } = KcpConstants.Config.DefaultNoDelay;
+        public int Interval { get; set; } = KcpConstants.Config.DefaultInterval;
+        public int Resend { get; set; } = KcpConstants.Config.DefaultResend;
+        public bool Nc { get; set; } = KcpConstants.Config.DefaultNc;
+        public int SndWnd { get; set; } = KcpConstants.Config.DefaultSndWnd;
+        public int RcvWnd { get; set; } = KcpConstants.Config.DefaultRcvWnd;
+        public int Mtu { get; set; } = KcpConstants.Config.DefaultMtu;
     }
 
     public class KcpStats
@@ -68,6 +68,7 @@ namespace Kcp.Core
             
             // Try to set NoDelay and Window if methods exist
             // Note: KcpSharp 0.8.8 might have these methods on KcpConversation
+            // Note: KcpSharp 0.8.8 might have these methods on KcpConversation
             try 
             {
                 // Reflection to avoid build error if method missing in this specific version
@@ -84,7 +85,11 @@ namespace Kcp.Core
                      setWindowSize.Invoke(_kcpConv, new object[] { config.SndWnd, config.RcvWnd });
                 }
             } 
-            catch { /* Ignore */ }
+            catch (Exception ex)
+            { 
+                // Ignore reflection errors as these methods might not exist in all KcpSharp versions
+                OnLog?.Invoke($"[Warning] Failed to set KCP options via reflection: {ex.Message}");
+            }
             
             OnLog?.Invoke($"Connected to {ip}:{port} with Conv {convId}");
             OnConnected?.Invoke();
@@ -97,17 +102,44 @@ namespace Kcp.Core
         {
             if (_kcpConv == null) return null;
             
-            // Accessing internal KCP state if possible.
-            // KcpSharp's KcpConversation might expose:
-            // - UnflushedBytes
-            // - WaitSnd (maybe)
-            // Let's return a dummy or minimal stats if properties are not found during compilation.
-            // But I will try to use standard names.
-            return new KcpStats 
+            var stats = new KcpStats();
+            try 
             {
-                 // WaitSnd = _kcpConv.WaitSnd, // Uncomment if available
-                 // Rto = _kcpConv.RxRto // Uncomment if available
-            };
+                var type = _kcpConv.GetType();
+                var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+                // WaitSnd: _sndBuf count + _sendQueue count
+                // Based on log: Field: _sndBuf = LinkedList, Field: _sendQueue = KcpSendQueue
+                // We need to count items in these queues if possible, or look for a count field.
+                // KcpSharp usually doesn't expose a simple "WaitSnd" count directly on Conversation.
+                // But let's look at log again: Field: _snd_nxt = 2, Field: _snd_una = 2.
+                // WaitSnd usually equals (snd_nxt - snd_una) + snd_queue_size
+                
+                var f_snd_nxt = type.GetField("_snd_nxt", flags);
+                var f_snd_una = type.GetField("_snd_una", flags);
+                if (f_snd_nxt != null && f_snd_una != null)
+                {
+                    uint snd_nxt = (uint)f_snd_nxt.GetValue(_kcpConv);
+                    uint snd_una = (uint)f_snd_una.GetValue(_kcpConv);
+                    stats.WaitSnd = (int)(snd_nxt - snd_una);
+                }
+
+                // UnflushedBytes: Prop: UnflushedBytes = 0
+                var p_unflushed = type.GetProperty("UnflushedBytes", flags);
+                if (p_unflushed != null) stats.Unacked = Convert.ToInt32(p_unflushed.GetValue(_kcpConv));
+
+                // RTO: Field: _rx_rto = 100
+                // Use Convert.ToInt32 to handle potential uint/int mismatch during unboxing
+                var f_rx_rto = type.GetField("_rx_rto", flags);
+                if (f_rx_rto != null) stats.Rto = Convert.ToInt32(f_rx_rto.GetValue(_kcpConv));
+            }
+            catch (Exception)
+            {
+                // Reflection might fail if internal fields change in newer KcpSharp versions.
+                // We ignore this to avoid crashing the stats polling.
+            }
+            
+            return stats;
         }
 
 
@@ -115,7 +147,7 @@ namespace Kcp.Core
         {
             try
             {
-                byte[] buffer = new byte[4096];
+                byte[] buffer = new byte[KcpConstants.Config.ReceiveBufferSize];
                 while (!token.IsCancellationRequested && _kcpConv != null)
                 {
                     var result = await _kcpConv.ReceiveAsync(buffer, token);

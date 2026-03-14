@@ -37,13 +37,35 @@
 
         <!-- Header: Connection Config -->
         <StackPanel Grid.Row="1" Orientation="Vertical" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
-            <StackPanel Orientation="Horizontal" Spacing="10" Padding="10">
-                <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
-                <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
-                <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
-                <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
-                <TextBlock Text="{Binding StatsInfo}" VerticalAlignment="Bottom" Margin="20,0,0,5" Foreground="LightGreen" FontWeight="Bold"/>
-            </StackPanel>
+            <Grid Padding="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                    <TextBox Header="Server IP" Text="{Binding ServerIp, Mode=TwoWay}" Width="150"/>
+                    <NumberBox Header="Port" Value="{Binding ServerPort, Mode=TwoWay}" Width="100"/>
+                    <NumberBox Header="Conv ID" Value="{Binding ConvId, Mode=TwoWay}" Width="100"/>
+                    <Button Content="{Binding ConnectButtonText}" Click="Connect_Click" VerticalAlignment="Bottom"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20" VerticalAlignment="Bottom" Margin="20,0,0,5">
+                    <TextBlock Text="{Binding StatsInfo}" Foreground="LightGreen" FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="15" VerticalAlignment="Bottom" Margin="0,0,10,5">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="Status:" Foreground="Gray"/>
+                        <TextBlock Text="{Binding ConnectionStatus}" Foreground="{Binding StatusColor}" FontWeight="Bold"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="Health:" Foreground="Gray"/>
+                        <TextBlock Text="{Binding HealthStatus}" Foreground="{Binding HealthColor}" FontWeight="Bold"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
             
             <Expander Header="Advanced KCP Settings" HorizontalAlignment="Stretch" IsExpanded="False" Margin="10,0,10,10">
                 <StackPanel Orientation="Horizontal" Spacing="20" Padding="10">

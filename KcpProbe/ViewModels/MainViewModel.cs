@@ -20,21 +20,21 @@ namespace KcpProbe.ViewModels
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private string _serverIp = "127.0.0.1";
+        private string _serverIp = KcpConstants.Config.DefaultIp;
         public string ServerIp
         {
             get => _serverIp;
             set { _serverIp = value; OnPropertyChanged(nameof(ServerIp)); }
         }
 
-        private int _serverPort = 8888;
+        private int _serverPort = KcpConstants.Config.DefaultPort;
         public int ServerPort
         {
             get => _serverPort;
             set { _serverPort = value; OnPropertyChanged(nameof(ServerPort)); }
         }
 
-        private int _convId = 1001;
+        private int _convId = KcpConstants.Config.DefaultConvId;
         public int ConvId
         {
             get => _convId;
@@ -42,26 +42,60 @@ namespace KcpProbe.ViewModels
         }
 
         #region KCP Config
-        private bool _noDelay = true;
+        private bool _noDelay = KcpConstants.Config.DefaultNoDelay;
         public bool NoDelay { get => _noDelay; set { _noDelay = value; OnPropertyChanged(nameof(NoDelay)); } }
 
-        private int _interval = 10;
+        private int _interval = KcpConstants.Config.DefaultInterval;
         public int Interval { get => _interval; set { _interval = value; OnPropertyChanged(nameof(Interval)); } }
 
-        private int _resend = 2;
+        private int _resend = KcpConstants.Config.DefaultResend;
         public int Resend { get => _resend; set { _resend = value; OnPropertyChanged(nameof(Resend)); } }
 
-        private bool _nc = true;
+        private bool _nc = KcpConstants.Config.DefaultNc;
         public bool Nc { get => _nc; set { _nc = value; OnPropertyChanged(nameof(Nc)); } }
 
-        private int _sndWnd = 128;
+        private int _sndWnd = KcpConstants.Config.DefaultSndWnd;
         public int SndWnd { get => _sndWnd; set { _sndWnd = value; OnPropertyChanged(nameof(SndWnd)); } }
 
-        private int _rcvWnd = 128;
+        private int _rcvWnd = KcpConstants.Config.DefaultRcvWnd;
         public int RcvWnd { get => _rcvWnd; set { _rcvWnd = value; OnPropertyChanged(nameof(RcvWnd)); } }
         
         private string _statsInfo = "WaitSnd: 0 | Unacked: 0 | RTO: 0";
         public string StatsInfo { get => _statsInfo; set { _statsInfo = value; OnPropertyChanged(nameof(StatsInfo)); } }
+        #endregion
+
+        #region Status & Health
+        private string _connectionStatus = KcpConstants.ConnectionStatus.Disconnected;
+        public string ConnectionStatus
+        {
+            get => _connectionStatus;
+            set { _connectionStatus = value; OnPropertyChanged(nameof(ConnectionStatus)); OnPropertyChanged(nameof(StatusColor)); }
+        }
+
+        private string _healthStatus = KcpConstants.HealthStatus.Unknown;
+        public string HealthStatus
+        {
+            get => _healthStatus;
+            set { _healthStatus = value; OnPropertyChanged(nameof(HealthStatus)); OnPropertyChanged(nameof(HealthColor)); }
+        }
+
+        public string StatusColor => ConnectionStatus switch
+        {
+            KcpConstants.ConnectionStatus.Connected => "LightGreen",
+            KcpConstants.ConnectionStatus.Connecting => "Yellow",
+            _ => "Red"
+        };
+
+        public string HealthColor => HealthStatus switch
+        {
+            KcpConstants.HealthStatus.Good => "LightGreen",
+            KcpConstants.HealthStatus.Fair => "Yellow",
+            KcpConstants.HealthStatus.Poor => "Orange",
+            KcpConstants.HealthStatus.Critical => "Red",
+            _ => "Gray"
+        };
+
+        private long _lastPongTime = 0;
         #endregion
 
         // Bots
@@ -116,12 +150,25 @@ namespace KcpProbe.ViewModels
             _dispatcher = DispatcherQueue.GetForCurrentThread();
             _client = new KcpClient();
             _client.OnLog += Log;
-            _client.OnConnected += () => { IsConnected = true; Log("Connected"); };
-            _client.OnDisconnected += () => { IsConnected = false; Log("Disconnected"); };
+            _client.OnConnected += () => 
+            { 
+                IsConnected = true; 
+                Log("Connected");
+                ConnectionStatus = KcpConstants.ConnectionStatus.Connected;
+                HealthStatus = KcpConstants.HealthStatus.Checking;
+                _lastPongTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            };
+            _client.OnDisconnected += () => 
+            { 
+                IsConnected = false; 
+                Log("Disconnected"); 
+                ConnectionStatus = KcpConstants.ConnectionStatus.Disconnected;
+                HealthStatus = KcpConstants.HealthStatus.Unknown;
+            };
             _client.OnMessageReceived += OnMessageReceived;
 
-            PacketDispatcher.Instance.RegisterHandler(2, OnPong); // Register Pong handler
-            PacketDispatcher.Instance.RegisterHandler(101, OnRpcResponse); // Register RpcResponse handler
+            PacketDispatcher.Instance.RegisterHandler(KcpConstants.MessageIds.Pong, OnPong); // Register Pong handler
+            PacketDispatcher.Instance.RegisterHandler(KcpConstants.MessageIds.RpcResponse, OnRpcResponse); // Register RpcResponse handler
         }
 
         private void OnMessageReceived(byte[] data)
@@ -131,6 +178,8 @@ namespace KcpProbe.ViewModels
 
         private void OnPong(BaseMessage msg)
         {
+            _lastPongTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            
             var pong = PacketDispatcher.Instance.ParsePayload<Pong>(msg);
             
             // Handle both standard Probe:{ts} and server echoed Pong: Probe:{ts}
@@ -194,7 +243,7 @@ namespace KcpProbe.ViewModels
                     Params = ApiParams
                 };
 
-                await _client.SendAsync(100, req); // MsgId 100 is RpcRequest
+                await _client.SendAsync(KcpConstants.MessageIds.RpcRequest, req); // MsgId 100 is RpcRequest
                 Log($"Sent RPC: {ApiMethod} {ApiParams}");
             }
             catch (Exception ex)
@@ -212,6 +261,7 @@ namespace KcpProbe.ViewModels
             }
             else
             {
+                ConnectionStatus = KcpConstants.ConnectionStatus.Connecting;
                 try
                 {
                     var config = new KcpConfig 
@@ -229,6 +279,7 @@ namespace KcpProbe.ViewModels
                 catch (Exception ex)
                 {
                     Log($"Connect Error: {ex.Message}");
+                    ConnectionStatus = KcpConstants.ConnectionStatus.Disconnected;
                 }
             }
         }
@@ -251,11 +302,33 @@ namespace KcpProbe.ViewModels
                 {
                     var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                     var ping = new Ping { Content = $"Probe:{now}", SendTime = (ulong)now };
-                    await _client.SendAsync(1, ping);
+                    await _client.SendAsync(KcpConstants.MessageIds.Ping, ping);
+                    
+                    // Health Check
+                    long timeSinceLastPong = now - _lastPongTime;
+                    if (timeSinceLastPong > KcpConstants.Timeouts.HealthCriticalMs)
+                    {
+                        HealthStatus = KcpConstants.HealthStatus.Critical;
+                    }
+                    else if (timeSinceLastPong > KcpConstants.Timeouts.HealthPoorMs)
+                    {
+                        HealthStatus = KcpConstants.HealthStatus.Poor;
+                    }
+                    else if (timeSinceLastPong > KcpConstants.Timeouts.HealthFairMs)
+                    {
+                        HealthStatus = KcpConstants.HealthStatus.Fair;
+                    }
+                    else
+                    {
+                        HealthStatus = KcpConstants.HealthStatus.Good;
+                    }
                 }
-                catch {}
+                catch (Exception)
+                {
+                     // Ignore send errors during polling to avoid log spam
+                }
                 
-                await Task.Delay(500);
+                await Task.Delay(KcpConstants.Timeouts.StatsPollingIntervalMs);
             }
         }
 
@@ -275,7 +348,7 @@ namespace KcpProbe.ViewModels
                     SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                 };
 
-                await _client.SendAsync(1, ping); // MsgId 1 is Ping
+                await _client.SendAsync(KcpConstants.MessageIds.Ping, ping); // MsgId 1 is Ping
                 Log($"Sent Ping: {PingContent}");
             }
             catch (Exception ex)
@@ -336,8 +409,8 @@ namespace KcpProbe.ViewModels
              while (_isStressing && IsConnected)
              {
                  var ping = new Ping { Content = $"Stress {count++}", SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
-                 await _client.SendAsync(1, ping);
-                 await Task.Delay(10); // 100 QPS roughly per thread
+                 await _client.SendAsync(KcpConstants.MessageIds.Ping, ping);
+                 await Task.Delay(KcpConstants.Timeouts.StressIntervalMs); // 100 QPS roughly per thread
              }
              _isStressing = false;
         }
@@ -352,7 +425,7 @@ namespace KcpProbe.ViewModels
             var scriptPath = ResolveRegressionScriptPath();
             if (string.IsNullOrWhiteSpace(scriptPath))
             {
-                Log("Regression script not found: run-regression.ps1");
+                Log($"Regression script not found: {KcpConstants.Scripts.RegressionScript}");
                 return;
             }
 
@@ -455,7 +528,7 @@ namespace KcpProbe.ViewModels
             var current = new DirectoryInfo(AppContext.BaseDirectory);
             for (var i = 0; i < 8 && current != null; i++)
             {
-                var candidate = Path.Combine(current.FullName, "run-regression.ps1");
+                var candidate = Path.Combine(current.FullName, KcpConstants.Scripts.RegressionScript);
                 if (File.Exists(candidate))
                 {
                     return candidate;

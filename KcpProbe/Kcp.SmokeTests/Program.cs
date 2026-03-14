@@ -1,6 +1,7 @@
 using Kcp.SmokeTests;
 using Kcp.SmokeTests.Cases;
 using System.Text;
+using Kcp.Core;
 
 Console.OutputEncoding = new UTF8Encoding(false);
 
@@ -70,11 +71,11 @@ static SmokeTestOptions ParseOptions(string[] args)
 
     return new SmokeTestOptions
     {
-        Ip = GetValue(dict, "--ip", "127.0.0.1"),
-        Port = GetIntValue(dict, "--port", 8888),
-        ConvId = GetIntValue(dict, "--conv", 1001),
+        Ip = GetValue(dict, "--ip", KcpConstants.Config.DefaultIp),
+        Port = GetIntValue(dict, "--port", KcpConstants.Config.DefaultPort),
+        ConvId = GetIntValue(dict, "--conv", KcpConstants.Config.DefaultConvId),
         StressCount = GetIntValue(dict, "--count", 200),
-        TimeoutMs = GetIntValue(dict, "--timeout", 5000)
+        TimeoutMs = GetIntValue(dict, "--timeout", KcpConstants.Timeouts.HealthCriticalMs)
     };
 }
 

@@ -1,4 +1,5 @@
 using KcpServer;
+using Kcp.Core;
 
 namespace Kcp.SmokeTests.Cases;
 
@@ -9,16 +10,16 @@ internal sealed class PingPongCase : SmokeTestCaseBase
     protected override async Task<string> ExecuteCoreAsync(SmokeTestContext context, CancellationToken cancellationToken)
     {
         var content = $"smoke-{Guid.NewGuid():N}";
-        context.ClearMessageQueue(2);
+        context.ClearMessageQueue(KcpConstants.MessageIds.Pong);
 
-        await context.Client.SendAsync(1, new Ping
+        await context.Client.SendAsync(KcpConstants.MessageIds.Ping, new Ping
         {
             Content = content,
             SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
 
         var baseMessage = await context.WaitForMessageAsync(
-            2,
+            KcpConstants.MessageIds.Pong,
             TimeSpan.FromMilliseconds(context.Options.TimeoutMs),
             _ => true,
             cancellationToken);

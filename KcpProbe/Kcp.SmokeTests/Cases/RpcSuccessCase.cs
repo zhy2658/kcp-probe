@@ -1,4 +1,5 @@
 using KcpServer;
+using Kcp.Core;
 
 namespace Kcp.SmokeTests.Cases;
 
@@ -9,16 +10,16 @@ internal sealed class RpcSuccessCase : SmokeTestCaseBase
     protected override async Task<string> ExecuteCoreAsync(SmokeTestContext context, CancellationToken cancellationToken)
     {
         var payload = $"{{\"trace\":\"{Guid.NewGuid():N}\"}}";
-        context.ClearMessageQueue(101);
+        context.ClearMessageQueue(KcpConstants.MessageIds.RpcResponse);
 
-        await context.Client.SendAsync(100, new RpcRequest
+        await context.Client.SendAsync(KcpConstants.MessageIds.RpcRequest, new RpcRequest
         {
             Method = "TestApi",
             Params = payload
         });
 
         var baseMessage = await context.WaitForMessageAsync(
-            101,
+            KcpConstants.MessageIds.RpcResponse,
             TimeSpan.FromMilliseconds(context.Options.TimeoutMs),
             _ => true,
             cancellationToken);

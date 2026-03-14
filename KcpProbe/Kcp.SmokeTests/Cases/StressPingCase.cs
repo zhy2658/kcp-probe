@@ -1,4 +1,5 @@
 using KcpServer;
+using Kcp.Core;
 
 namespace Kcp.SmokeTests.Cases;
 
@@ -11,11 +12,11 @@ internal sealed class StressPingCase : SmokeTestCaseBase
         var prefix = $"stress-{Guid.NewGuid():N}";
         var count = context.Options.StressCount;
         var received = 0;
-        context.ClearMessageQueue(2);
+        context.ClearMessageQueue(KcpConstants.MessageIds.Pong);
 
         for (var i = 0; i < count; i++)
         {
-            await context.Client.SendAsync(1, new Ping
+            await context.Client.SendAsync(KcpConstants.MessageIds.Ping, new Ping
             {
                 Content = $"{prefix}-{i}",
                 SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -26,7 +27,7 @@ internal sealed class StressPingCase : SmokeTestCaseBase
         while (DateTimeOffset.UtcNow < timeoutAt && received < count)
         {
             var message = await context.WaitForMessageAsync(
-                2,
+                KcpConstants.MessageIds.Pong,
                 TimeSpan.FromMilliseconds(100),
                 m =>
                 {

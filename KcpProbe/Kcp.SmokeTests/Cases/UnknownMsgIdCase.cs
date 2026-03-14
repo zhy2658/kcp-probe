@@ -1,4 +1,5 @@
 using KcpServer;
+using Kcp.Core;
 
 namespace Kcp.SmokeTests.Cases;
 
@@ -8,7 +9,7 @@ internal sealed class UnknownMsgIdCase : SmokeTestCaseBase
 
     protected override async Task<string> ExecuteCoreAsync(SmokeTestContext context, CancellationToken cancellationToken)
     {
-        await context.Client.SendAsync(65000, new RpcRequest
+        await context.Client.SendAsync(KcpConstants.MessageIds.Unknown, new RpcRequest
         {
             Method = "Noop",
             Params = "{}"
@@ -20,15 +21,15 @@ internal sealed class UnknownMsgIdCase : SmokeTestCaseBase
         }
 
         var content = $"guard-{Guid.NewGuid():N}";
-        context.ClearMessageQueue(2);
-        await context.Client.SendAsync(1, new Ping
+        context.ClearMessageQueue(KcpConstants.MessageIds.Pong);
+        await context.Client.SendAsync(KcpConstants.MessageIds.Ping, new Ping
         {
             Content = content,
             SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
 
         var pongMessage = await context.WaitForMessageAsync(
-            2,
+            KcpConstants.MessageIds.Pong,
             TimeSpan.FromMilliseconds(context.Options.TimeoutMs),
             _ => true,
             cancellationToken);
