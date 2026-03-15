@@ -82,9 +82,8 @@ namespace KcpServer {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public BaseMessage(BaseMessage other) : this() {
       msgId_ = other.msgId_;
-      payload_ = other.payload_;
       seq_ = other.seq_;
-      timestamp_ = other.timestamp_;
+      payload_ = other.payload_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -106,20 +105,8 @@ namespace KcpServer {
       }
     }
 
-    /// <summary>Field number for the "payload" field.</summary>
-    public const int PayloadFieldNumber = 2;
-    private pb::ByteString payload_ = pb::ByteString.Empty;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pb::ByteString Payload {
-      get { return payload_; }
-      set {
-        payload_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
     /// <summary>Field number for the "seq" field.</summary>
-    public const int SeqFieldNumber = 3;
+    public const int SeqFieldNumber = 2;
     private uint seq_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -130,15 +117,15 @@ namespace KcpServer {
       }
     }
 
-    /// <summary>Field number for the "timestamp" field.</summary>
-    public const int TimestampFieldNumber = 4;
-    private ulong timestamp_;
+    /// <summary>Field number for the "payload" field.</summary>
+    public const int PayloadFieldNumber = 3;
+    private pb::ByteString payload_ = pb::ByteString.Empty;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong Timestamp {
-      get { return timestamp_; }
+    public pb::ByteString Payload {
+      get { return payload_; }
       set {
-        timestamp_ = value;
+        payload_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -158,9 +145,8 @@ namespace KcpServer {
         return true;
       }
       if (MsgId != other.MsgId) return false;
-      if (Payload != other.Payload) return false;
       if (Seq != other.Seq) return false;
-      if (Timestamp != other.Timestamp) return false;
+      if (Payload != other.Payload) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -169,9 +155,8 @@ namespace KcpServer {
     public override int GetHashCode() {
       int hash = 1;
       if (MsgId != 0) hash ^= MsgId.GetHashCode();
-      if (Payload.Length != 0) hash ^= Payload.GetHashCode();
       if (Seq != 0) hash ^= Seq.GetHashCode();
-      if (Timestamp != 0UL) hash ^= Timestamp.GetHashCode();
+      if (Payload.Length != 0) hash ^= Payload.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -194,17 +179,13 @@ namespace KcpServer {
         output.WriteRawTag(8);
         output.WriteUInt32(MsgId);
       }
-      if (Payload.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Payload);
-      }
       if (Seq != 0) {
-        output.WriteRawTag(24);
+        output.WriteRawTag(16);
         output.WriteUInt32(Seq);
       }
-      if (Timestamp != 0UL) {
-        output.WriteRawTag(32);
-        output.WriteUInt64(Timestamp);
+      if (Payload.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Payload);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -220,17 +201,13 @@ namespace KcpServer {
         output.WriteRawTag(8);
         output.WriteUInt32(MsgId);
       }
-      if (Payload.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteBytes(Payload);
-      }
       if (Seq != 0) {
-        output.WriteRawTag(24);
+        output.WriteRawTag(16);
         output.WriteUInt32(Seq);
       }
-      if (Timestamp != 0UL) {
-        output.WriteRawTag(32);
-        output.WriteUInt64(Timestamp);
+      if (Payload.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Payload);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -245,14 +222,11 @@ namespace KcpServer {
       if (MsgId != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(MsgId);
       }
-      if (Payload.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Payload);
-      }
       if (Seq != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Seq);
       }
-      if (Timestamp != 0UL) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(Timestamp);
+      if (Payload.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Payload);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -269,14 +243,11 @@ namespace KcpServer {
       if (other.MsgId != 0) {
         MsgId = other.MsgId;
       }
-      if (other.Payload.Length != 0) {
-        Payload = other.Payload;
-      }
       if (other.Seq != 0) {
         Seq = other.Seq;
       }
-      if (other.Timestamp != 0UL) {
-        Timestamp = other.Timestamp;
+      if (other.Payload.Length != 0) {
+        Payload = other.Payload;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -301,16 +272,12 @@ namespace KcpServer {
             MsgId = input.ReadUInt32();
             break;
           }
-          case 18: {
-            Payload = input.ReadBytes();
-            break;
-          }
-          case 24: {
+          case 16: {
             Seq = input.ReadUInt32();
             break;
           }
-          case 32: {
-            Timestamp = input.ReadUInt64();
+          case 26: {
+            Payload = input.ReadBytes();
             break;
           }
         }
@@ -336,16 +303,12 @@ namespace KcpServer {
             MsgId = input.ReadUInt32();
             break;
           }
-          case 18: {
-            Payload = input.ReadBytes();
-            break;
-          }
-          case 24: {
+          case 16: {
             Seq = input.ReadUInt32();
             break;
           }
-          case 32: {
-            Timestamp = input.ReadUInt64();
+          case 26: {
+            Payload = input.ReadBytes();
             break;
           }
         }

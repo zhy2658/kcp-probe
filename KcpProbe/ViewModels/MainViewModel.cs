@@ -40,6 +40,7 @@ namespace KcpProbe.ViewModels
         [ObservableProperty] private string _pingContent = "Hello KCP";
         [ObservableProperty] private string _apiMethod = "TestApi";
         [ObservableProperty] private string _apiParams = "{}";
+        [ObservableProperty] private string _worldInfo = "Waiting for snapshots...";
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(StressButtonText))]
@@ -66,6 +67,7 @@ namespace KcpProbe.ViewModels
             _connectionService.StatsUpdated += stats => _dispatcher.TryEnqueue(() => Status.UpdateStats(stats));
             _connectionService.HealthStatusChanged += status => _dispatcher.TryEnqueue(() => Status.HealthStatus = status);
             _connectionService.RttUpdated += rtt => _dispatcher.TryEnqueue(() => RttUpdated?.Invoke(rtt));
+            _connectionService.WorldSnapshotReceived += OnWorldSnapshotReceived;
 
             _stressTestService.Log += Log;
             _stressTestService.IsStressingChanged += isStressing => _dispatcher.TryEnqueue(() => IsStressing = isStressing);
@@ -114,6 +116,20 @@ namespace KcpProbe.ViewModels
         private void Log(string message)
         {
             Log(LogLevel.Info, message);
+        }
+
+        private void OnWorldSnapshotReceived(WorldSnapshot snapshot)
+        {
+            _dispatcher.TryEnqueue(() =>
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"[Snapshot] Seq: {snapshot.Seq} | Time: {snapshot.ServerTime} | Count: {snapshot.Entities.Count}");
+                foreach (var entity in snapshot.Entities)
+                {
+                    sb.AppendLine($" - ID:{entity.EntityId} HP:{entity.Hp} Pos:({entity.Pos?.X:F1}, {entity.Pos?.Y:F1}, {entity.Pos?.Z:F1})");
+                }
+                WorldInfo = sb.ToString();
+            });
         }
 
         private void RefreshLogsView()

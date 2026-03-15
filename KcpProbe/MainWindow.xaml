@@ -137,7 +137,7 @@
                     <StackPanel Grid.Column="0" Spacing="10" Margin="0,0,10,0">
                         <TextBlock Text="Interface Test" Style="{StaticResource SubtitleTextBlockStyle}"/>
                         <TextBox Header="Ping Content" Text="{Binding PingContent, Mode=TwoWay}"/>
-                        <Button Content="Send Ping" Command="{Binding SendPingCommand}"/>
+                        <Button Content="Send Ping11" Command="{Binding SendPingCommand}"/>
 
                         <!-- RPC Section -->
                         <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
@@ -146,6 +146,16 @@
                                 <TextBox Header="Method" Text="{Binding ApiMethod, Mode=TwoWay}"/>
                                 <TextBox Header="Params (JSON)" Text="{Binding ApiParams, Mode=TwoWay}" Height="100" AcceptsReturn="True" TextWrapping="Wrap"/>
                                 <Button Content="Call API" Command="{Binding SendRpcCommand}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- World Info Section -->
+                        <Border Margin="0,20,0,0" BorderThickness="0,1,0,0" BorderBrush="Gray" Padding="0,10,0,0">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="World Snapshot" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                                <ScrollViewer Height="150" BorderBrush="#303030" BorderThickness="1" Background="#101010">
+                                    <TextBlock Text="{Binding WorldInfo}" FontFamily="Consolas" FontSize="12" Margin="5" TextWrapping="Wrap"/>
+                                </ScrollViewer>
                             </StackPanel>
                         </Border>
                     </StackPanel>

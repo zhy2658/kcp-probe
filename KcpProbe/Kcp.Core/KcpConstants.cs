@@ -25,6 +25,7 @@ namespace Kcp.Core
             public const uint Pong = 2;
             public const uint RpcRequest = 100;
             public const uint RpcResponse = 101;
+            public const uint WorldSnapshot = 2001;
             public const uint Unknown = 65000;
         }
 

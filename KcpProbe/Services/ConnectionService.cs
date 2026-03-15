@@ -16,6 +16,7 @@ namespace KcpProbe.Services
         public event Action<KcpStats>? StatsUpdated;
         public event Action<string>? HealthStatusChanged;
         public event Action<double>? RttUpdated;
+        public event Action<WorldSnapshot>? WorldSnapshotReceived;
 
         private readonly PacketDispatcher _dispatcher;
 
@@ -28,6 +29,7 @@ namespace KcpProbe.Services
             // Register handlers
             _dispatcher.RegisterHandler(KcpConstants.MessageIds.Pong, OnPong);
             _dispatcher.RegisterHandler(KcpConstants.MessageIds.RpcResponse, OnRpcResponse);
+            _dispatcher.RegisterHandler(KcpConstants.MessageIds.WorldSnapshot, OnWorldSnapshot);
         }
 
         public async Task ConnectAsync(string ip, int port, int convId, KcpConfig config)
@@ -136,6 +138,12 @@ namespace KcpProbe.Services
             // ConnectionService shouldn't depend on UI logging directly.
             // But MainViewModel subscribed to _client.OnLog.
             // Here we handle business logic.
+        }
+
+        private void OnWorldSnapshot(BaseMessage msg)
+        {
+            var snapshot = _dispatcher.ParsePayload<WorldSnapshot>(msg);
+            WorldSnapshotReceived?.Invoke(snapshot);
         }
     }
 }

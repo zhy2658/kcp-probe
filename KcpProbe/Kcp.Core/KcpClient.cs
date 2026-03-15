@@ -82,7 +82,7 @@ namespace Kcp.Core
                 _f_rx_rto = type.GetField("_rx_rto", flags);
                 _reflectionInitialized = true;
             }
-            catch
+            catch (Exception)
             {
                 // Ignore reflection errors
             }
@@ -115,7 +115,7 @@ namespace Kcp.Core
             {
                 // Log only in debug to avoid spam
                 #if DEBUG
-                System.Diagnostics.Debug.WriteLine($"Stats Error: {ex.Message}");
+                OnLog?.Invoke(LogLevel.Error, $"Stats Error: {ex.Message}");
                 #endif
             }
             
@@ -161,8 +161,7 @@ namespace Kcp.Core
             {
                 MsgId = msgId,
                 Payload = message.ToByteString(),
-                Seq = 0,
-                Timestamp = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                Seq = 0
             };
 
             await SendBaseMessageAsync(baseMsg);

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace KcpProbe.ViewModels
 {
-    public partial class BotViewModel : ObservableObject
+   public partial class BotViewModel : ObservableObject
     {
         private readonly BotManager _botManager;
         private readonly KcpConfigViewModel _configVm;
